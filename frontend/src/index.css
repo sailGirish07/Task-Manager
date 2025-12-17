@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- Base styles ---------- */
+@layer base {
+  html {
+    font-family: "Poppins", sans-serif;
+  }
+
+  body {
+    background-color: #fcfbfc;
+    overflow-x: hidden;
+  }
+}
+
+/* ---------- Component classes ---------- */
+@layer components {
+  .input-box {
+    @apply w-full flex justify-between gap-3
+      text-sm text-black
+      bg-slate-100/50 rounded
+      px-4 py-3 mt-3 mb-4
+      border border-slate-200 outline-none;
+  }
+
+  .btn-primary {
+    @apply w-full text-sm font-medium text-white bg-primary
+      shadow-lg shadow-purple-600/5 p-2.5 rounded-md my-1
+      hover:bg-blue-600/20 hover:text-blue-600 cursor-pointer;
+  }
+
+  .card {
+    @apply bg-white p-6 rounded-2xl
+      shadow-md shadow-gray-100
+      border border-gray-200/50;
+  }
+
+  .card-btn {
+    @apply flex items-center gap-3
+      text-xs font-medium text-gray-700
+      hover:text-primary bg-gray-50 hover:bg-blue-50
+      px-4 py-1.5 rounded-lg
+      border border-gray-200/50 cursor-pointer;
+  }
+}
+
+.form-card{
+  @apply bg-white p-6 rounded-lg shadow-md shadow-gray-100 border border-gray-200/50;
+}
+
+.form-input{
+  @apply w-full text-sm text-black outline-none bg-white border border-slate-100 px-2.5 py-3 rounded-md mt-2 placeholder:text-gray-500;
+}

@@ -1,0 +1,22 @@
+{
+  "name": "task-manager",
+  "version": "1.0.0",
+  "description": "A full-stack task management application built with the MERN stack",
+  "main": "index.js",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd Backend && npm run dev",
+    "install:all": "npm install && cd frontend && npm install && cd ../Backend && npm install",
+    "build:frontend": "cd frontend && npm run build"
+  },
+  "keywords": [
+    "task-manager",
+    "mern",
+    "react",
+    "nodejs",
+    "express",
+    "mongodb"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

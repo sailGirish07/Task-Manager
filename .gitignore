@@ -1,0 +1,25 @@
+# Root level .gitignore for the entire project
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env*
+
+# Logs
+logs
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE specific files
+.vscode/
+!.vscode/extensions.json
+.idea/
