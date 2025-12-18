@@ -16,6 +16,7 @@ import ManageUsers from './pages/Admin/ManageUsers'
 import UserDashboard from './pages/User/UserDashboard'
 import MyTasks from './pages/User/MyTasks'
 import ViewTaskDetails from './pages/User/ViewTaskDetails'
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (
@@ -46,6 +47,15 @@ function App() {
           </Routes>
         </Router>
       </div>
+
+      <Toaster
+      toastOptions={{
+        className: "",
+        style: {
+          fontsize: "13px"
+        },
+      }}
+      />
     </UserProvider>
   )
 }
