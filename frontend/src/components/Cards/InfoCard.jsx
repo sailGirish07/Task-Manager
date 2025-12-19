@@ -7,7 +7,6 @@ export default function InfoCard({icon, label, value, color}){
                 <p className="text-xs md:text-[14px] text-gray-500 whitespace-nowrap">
                     <span className="text-sm md:text-[15px] text-black font-semibold mr-1">{value}</span>{label}
                 </p>
-            {/* </div> */}
-        </div>
+            </div>
     )
 }

@@ -22,7 +22,7 @@ export default function TodoListInput({ todoList, setTodoList }) {
 
     return(
     <div>
-        {todoList.map((item, index) => {
+        {todoList.map((item, index) => (
             <div
             key={index}
             className="flex justify-between bg-gray-50 border border-gray-100 px-3 py-2 rounded-md mb-3 mt-2"
@@ -44,7 +44,7 @@ export default function TodoListInput({ todoList, setTodoList }) {
 
                 </button>
                 </div>
-        })}
+        ))}
 
         <div className="flex items-center gap-5 mt-4">
             <input

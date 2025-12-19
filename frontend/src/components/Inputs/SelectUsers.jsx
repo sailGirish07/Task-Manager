@@ -3,6 +3,7 @@ import Modal from "../Modal";
 import { LuUsers } from "react-icons/lu";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
+import AvatarGroup from "../AvatarGroup";
 
 
 export default function SelectUsers({selectedUsers, setSelectedUsers}) {
@@ -36,27 +37,29 @@ export default function SelectUsers({selectedUsers, setSelectedUsers}) {
   };
 
   const selectedUserAvatars = allUsers
-    .filter((user) => selectedUsers.includes(user.id))
-    .map((user) => user.profileImageIrl);
+    .filter((user) => selectedUsers.includes(user._id))
+    .map((user) => user.profileImageUrl);
 
     useEffect(() => {
       getAllUsers();
     }, []);
 
     useEffect(() => {
-      if (selectedUsers.length === 0){
-        setTempSelectedUsers([]);
-      }
+      setTempSelectedUsers(selectedUsers);
 
       return () => {};
-    }, [selectedUsers]);
+    }, [selectedUsers, isModalOpen]);
 
 
   return (
   <div className="space-y-4 mt-2">
-    {selectedUserAvatars.length === 0 && (
+    {selectedUserAvatars.length === 0 ? (
         <button className="card-btn" onClick={() => setIsModalOpen(true)}>
             <LuUsers className="text-sm"/>Add Members
+        </button>
+    ) : (
+        <button className="card-btn" onClick={() => setIsModalOpen(true)}>
+            <LuUsers className="text-sm"/>Edit Members ({selectedUserAvatars.length})
         </button>
     )}
 
@@ -77,11 +80,17 @@ export default function SelectUsers({selectedUsers, setSelectedUsers}) {
                 key={user._id}
                 className="flex items-center gap-4 p-3 border-b border-gray-200"
                 >
+                    {user.profileImageUrl ? (
                     <img
-                    src={user.profileImageIrl}
+                    src={user.profileImageUrl}
                     alt={user.name}
                     className="w-10 h-10 rounded-full"
                     />
+                    ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                        <span className="text-gray-500 text-xs">{user.name.charAt(0)}</span>
+                    </div>
+                    )}
 
                     <div
                     className="flex-1">
@@ -93,11 +102,11 @@ export default function SelectUsers({selectedUsers, setSelectedUsers}) {
 
                     <input
                     type="checkbox"
-                    checked={tempSelectedUsers.includes(user.id)}
-                    onChange={() => toggleUserSelection(user.id)}
+                    checked={tempSelectedUsers.includes(user._id)}
+                    onChange={() => toggleUserSelection(user._id)}
                     className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded-sm outline-none"
                     />
-                    </div>
+                </div>
             ))}
         </div>
 

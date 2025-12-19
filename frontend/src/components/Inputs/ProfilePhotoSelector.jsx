@@ -51,11 +51,17 @@ export default function ProfilePhotoSelector({image, setImage}) {
                 </div>
             ) : (
                 <div className="relative">
+                    {previewUrl ? (
                     <img
                         src={previewUrl}
                         alt="profile photo"
                         className="w-20 h-20 rounded-full object-cover"
                     />
+                    ) : (
+                    <div className="w-20 h-20 rounded-full object-cover bg-blue-100 flex items-center justify-center">
+                        <span className="text-gray-400">No Image</span>
+                    </div>
+                    )}
                     <button 
                         type="button"
                         className="w-8 h-8 flex items-center justify-center bg-red-500 text-white rounded-full absolute -bottom-1 -right-1"

@@ -10,7 +10,7 @@ export default function Progress({progress, status}){
                 case 'Completed':
                     return 'text-indigo-500 bg-indigo-50 border border-indigo-500/10';
 
-                    case 'default':
+                    default:
                         return 'text-violet-500 bg-violet-50 border border-violet-500/10';
         }
     }

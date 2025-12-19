@@ -2,30 +2,31 @@ export const BASE_URL = "http://localhost:8000";
 
 export const API_PATHS = {
   AUTH: {
-    REGISTER: "/api/auth/register", // Register a new user (Admin or Member)
-    LOGIN: "/api/auth/login", // Authenticate user & return JWT token
-    GET_PROFILE: "/api/auth/profile", // Get logged-in user details
+    REGISTER: "/api/auth/register", // Register a new user (Admin or Member) ok
+    LOGIN: "/api/auth/login", // Authenticate user & return JWT token ok
+    GET_PROFILE: "/api/auth/profile", // Get logged-in user details ok
   },
 
   USERS: {
-    GET_ALL_USERS: "/api/users", // Get all users (Admin only)
-    GET_USER_BY_ID: (userId) => `/api/users/${userId}`, // Get user by ID
-    CREATE_USER: "/api/users", // Create a new user (Admin only)
-    UPDATE_USER: (userId) => `/api/users/${userId}`, // Update user details
-    DELETE_USER: (userId) => `/api/users/${userId}`, // Delete a user
+    GET_ALL_USERS: "/api/users", // Get all users (Admin only)   ok
+    GET_USER_BY_ID: (userId) => `/api/users/${userId}`, // Get user by ID   ok
+    CREATE_USER: "/api/users", // Create a new user (Admin only)    No Functional
+    UPDATE_USER: (userId) => `/api/users/${userId}`, // Update user details   ok
+    DELETE_USER: (userId) => `/api/users/${userId}`, // Delete a user    No Functional
   },
 
   TASKS: {
-    GET_DASHBOARD_DATA: "/api/tasks/dashboard-data", // Get Dashboard Data
-    GET_USER_DASHBOARD_DATA: "/api/tasks/user-dashboard-data", // Get User Dashboard Data
-    GET_ALL_TASKS: "/api/tasks", // Get all tasks (Admin: all, User: only assigned)
-    GET_TASK_BY_ID: (taskId) => `/api/tasks/${taskId}`, // Get task by ID
-    CREATE_TASK: "/api/tasks", // Create a new task (Admin only)
+    GET_DASHBOARD_DATA: "/api/tasks/dashboard-data", // Get Dashboard Data         ok
+    GET_USER_DASHBOARD_DATA: "/api/tasks/user-dashboard-data", // Get User Dashboard Data  ok
+    GET_ALL_TASKS: "/api/tasks", // Get all tasks (Admin: all, User: only assigned)        ok
+    GET_TASK_BY_ID: (taskId) => `/api/tasks/${taskId}`, // Get task by ID                  ok
+    CREATE_TASK: "/api/tasks", // Create a new task (Admin only)                           ok
     UPDATE_TASK: (taskId) => `/api/tasks/${taskId}`, // Update task details
     DELETE_TASK: (taskId) => `/api/tasks/${taskId}`, // Delete a task (Admin only)
     
     UPDATE_TASK_STATUS: (taskId) => `/api/tasks/${taskId}/status`, // Update task status
     UPDATE_TODO_CHECKLIST: (taskId) => `/api/tasks/${taskId}/todo`, // Update todo checklist
+    UPLOAD_ATTACHMENT: "/api/tasks/upload-attachment", // Upload task attachment
   },
 
   REPORTS: {
@@ -34,6 +35,6 @@ export const API_PATHS = {
   },
 
   IMAGE: {
-    UPLOAD_IMAGE: "/api/auth/upload-image",
+    UPLOAD_IMAGE: "/api/auth/upload-image",  // ok (Gives an link to set the profileImage)
   },
 };

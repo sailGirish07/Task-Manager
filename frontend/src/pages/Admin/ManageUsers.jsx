@@ -4,6 +4,7 @@ import axiosInstance from '../../utils/axiosInstance'
 import { API_PATHS } from '../../utils/apiPaths'
 import { LuFileSpreadsheet } from 'react-icons/lu'
 import UserCard from '../../components/Cards/UserCard'
+import toast from 'react-hot-toast'
 
 export default function ManageUsers() {
 

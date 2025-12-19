@@ -16,17 +16,40 @@ export default function Login() {
   const { updateUser } = useContext(UserContext);
   const navigate = useNavigate();
 
+  // Function to clear error and specific form fields
+  const clearErrorAndField = (fieldToClear) => {
+    setError("");
+    
+    // Only clear the specific field that had the error
+    switch(fieldToClear) {
+      case 'email':
+        setEmail("");
+        break;
+      case 'password':
+        setPassword("");
+        break;
+      default:
+        // If no specific field, clear all fields
+        setEmail("");
+        setPassword("");
+    }
+  };
+
   //Handle login form submit
   const handleLogin = async (e) => {
     e.preventDefault();
 
     if (!validateEmail(email)) {
       setError("Please enter a valid email address");
+      // Clear error message after 1.5 seconds
+      setTimeout(() => clearErrorAndField('email'), 2000);
       return;
     }
 
     if (!password) {
       setError("Please enter the password");
+      // Clear error message after 1.5 seconds
+      setTimeout(() => clearErrorAndField('password'), 2000);
       return;
     }
 
@@ -57,6 +80,9 @@ export default function Login() {
       } else {
         setError("Something went wrong. Please try again");
       }
+      
+      // Clear error message after 1.5 seconds
+      setTimeout(() => clearErrorAndField(), 2000);
     }
   };
 

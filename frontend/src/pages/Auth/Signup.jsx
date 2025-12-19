@@ -8,6 +8,7 @@ import { API_PATHS } from "../../utils/apiPaths";
 import { useContext } from "react";
 import uploadImage from "../../utils/uploadImage";
 import UserContext from "../../context/UserContext";
+import { validateEmail } from "../../utils/helper";
 
 export default function Signup() {
   const [profilePic, setProfilePic] = useState(null);
@@ -21,6 +22,37 @@ export default function Signup() {
   const {updateUser} = useContext(UserContext)
     const navigate = useNavigate();
 
+  // Function to clear error and specific form fields
+  const clearErrorAndField = (fieldToClear) => {
+    setError("");
+    
+    // Only clear the specific field that had the error
+    switch(fieldToClear) {
+      case 'fullName':
+        setFullName("");
+        break;
+      case 'email':
+        setEmail("");
+        break;
+      case 'password':
+        setPassword("");
+        break;
+      case 'adminInviteToken':
+        setAdminInviteToken("");
+        break;
+      case 'profilePic':
+        setProfilePic(null);
+        break;
+      default:
+        // If no specific field, clear all fields
+        setFullName("");
+        setEmail("");
+        setPassword("");
+        setAdminInviteToken("");
+        setProfilePic(null);
+    }
+  };
+
   //Handle signup form submt
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -29,16 +61,22 @@ export default function Signup() {
 
     if (!fullName) {
       setError("Please enter full name");
+      // Clear error message after 1.5 seconds
+      setTimeout(() => clearErrorAndField('fullName'), 2000);
       return;
     }
 
     if (!validateEmail(email)) {
       setError("Please enter  a valide email address");
+      // Clear error message after 1.5 seconds
+      setTimeout(() => clearErrorAndField('email'), 2000);
       return;
     }
 
     if (!password) {
       setError("Please enter the password");
+      // Clear error message after 1.5 seconds
+      setTimeout(() => clearErrorAndField('password'), 2000);
       return;
     }
 
@@ -55,30 +93,34 @@ export default function Signup() {
             name: fullName,
             email,
             password,
+            profileImageUrl,
             adminInviteToken
           });
 
           const {token, role} = response.data;
 
-           if(token){
-        localStorage.setItem("token", token);
-        updateUser(response.data)
+          if(token){
+            localStorage.setItem("token", token);
+            updateUser(response.data)
 
-        //Redirect based on the role
-        if(role === "admin"){
-          navigate("/admin/dashboard");
+            //Redirect based on the role
+            if(role === "admin"){
+              navigate("/admin/dashboard");
 
-        }else{
-          navigate("/user/dashboard");
-        }
-      }
+            }else{
+              navigate("/user/dashboard");
+            }
+          }
 
         }catch(err){
-          if(error.response && error.response.data.message){
-            setError(error.response.data.message);
+          if(err.response && err.response.data.message){
+            setError(err.response.data.message);
           }else{
             setError("Something went wrong. Please try again")
           }
+          
+          // Clear error message after 1.5 seconds
+          setTimeout(() => clearErrorAndField(), 2000);
         }
 
   };

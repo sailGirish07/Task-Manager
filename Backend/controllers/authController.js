@@ -40,13 +40,17 @@ const registerUser = async (req, res) => {
       role,
     });
 
-    //Return user data
+    //Generate token for newly registered user
+    const token = generateToken(user._id);
+    
+    //Return user data with token
     res.status(201).json({
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
       profileImageUrl: user.profileImageUrl,
+      token: token,
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -98,6 +102,7 @@ const updateUserProfile = async (req, res) => {
     }
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
+    user.profileImageUrl = req.body.profileImageUrl || user.profileImageUrl;
 
     if (req.body.password) {
       const salt = await bcrypt.genSalt(10);

@@ -16,7 +16,7 @@ import Modal from "../../components/Modal";
 
 
 export default function CreateTask() {
-  const loaction = useLocation();
+  const location = useLocation();
   const { taskId } = location.state || {};
   const navigate = useNavigate();
 
@@ -25,7 +25,7 @@ export default function CreateTask() {
     description: "",
     priority: "",
     dueDate: "",
-    assignedTo: "",
+    assignedTo: [],
     todoChecklist: [],
     attachments: [],
   });
@@ -45,9 +45,9 @@ export default function CreateTask() {
     setTaskData({
       title: "",
       description: "",
-      priority: "Low",
-      dueDate: null,
-      assignedTo: "",
+      priority: "Medium",
+      dueDate: "",
+      assignedTo: [],
       todoChecklist: [],
       attachments: [],
     });
@@ -57,6 +57,12 @@ export default function CreateTask() {
   const CreateTask = async () => {
    setLoading(true);
       try{
+        // Validate date before sending to backend
+        const dueDateObj = new Date(taskData.dueDate);
+        if (isNaN(dueDateObj.getTime())) {
+          throw new Error("Invalid date format");
+        }
+        
         const todolist = taskData.todoChecklist?.map((item) => ({
         text : item,
         completed : false,
@@ -64,7 +70,7 @@ export default function CreateTask() {
 
       const response = await axiosInstance.post(API_PATHS.TASKS.CREATE_TASK, {
         ...taskData,
-        dueDate: new Date(taskData.dueDate).toISOString(),
+        dueDate: dueDateObj.toISOString(),
         todoChecklist: todolist,
       });
 
@@ -73,6 +79,7 @@ export default function CreateTask() {
       clearData();
       }catch(err){
         console.log("Error creating task:", err);
+        setError("Failed to create task: " + (err.message || "Unknown error"));
         setLoading(false);
       }finally{
         setLoading(false)
@@ -84,6 +91,12 @@ export default function CreateTask() {
     setLoading(true)
 
     try{
+      // Validate date before sending to backend
+      const dueDateObj = new Date(taskData.dueDate);
+      if (isNaN(dueDateObj.getTime())) {
+        throw new Error("Invalid date format");
+      }
+      
       const todoList = taskData.todoChecklist?.map((item) => {
         const prevTodoChecklist = currentTask?.todoChecklist || [];
         const matchedTask = prevTodoChecklist.find((task) => task.text === item);
@@ -98,14 +111,23 @@ export default function CreateTask() {
         API_PATHS.TASKS.UPDATE_TASK(taskId),
         {
           ...taskData,
-          dueDate: new Date(taskData.dueDate).toString(),
-          todoChecklist: todolist,
+          dueDate: dueDateObj.toISOString(),
+          todoChecklist: todoList,
         }
       );
 
-      toast.success("Task updated sucessfully ")
+      toast.success("Task updated successfully");
+      // Clear the form after successful update
+      clearData();
+      // Reset currentTask state
+      setCurrentTask(null);
+      // Navigate back to tasks list
+      setTimeout(() => {
+        navigate('/admin/tasks');
+      }, 1000);
     }catch(err){
       console.error("Error updating task:", err)
+      setError("Failed to update task: " + (err.message || "Unknown error"));
       setLoading(false)
     }finally{
       setLoading(false)
@@ -116,17 +138,17 @@ export default function CreateTask() {
     setError(null);
 
     //Input Validation
-    if (!taskData.title.trim()) {
+    if (!taskData.title || !taskData.title.trim()) {
       setError("Title is required");
       return;
     }
-    if (!taskData.description.trim()) {
+    if (!taskData.description || !taskData.description.trim()) {
       setError("Description is required");
       return;
     }
 
-    if (!taskData.dueDate) {
-      setError("Due date is required");
+    if (!taskData.dueDate || isNaN(new Date(taskData.dueDate).getTime())) {
+      setError("Valid due date is required");
       return;
     }
 
@@ -154,24 +176,24 @@ export default function CreateTask() {
         API_PATHS.TASKS.GET_TASK_BY_ID(taskId)
       );
       
-      if(response.data){
-        const taskInfo = response.data;
+      if(response.data?.task){
+        const taskInfo = response.data.task;
         setCurrentTask(taskInfo);
 
-        setTaskData((prevState) => ({
-          title: taskInfo.title,
-          description: taskInfo.description,
-          priority: taskInfo.priority,
+        setTaskData({
+          title: taskInfo.title || "",
+          description: taskInfo.description || "",
+          priority: taskInfo.priority || "",
           dueDate: taskInfo.dueDate
            ? moment(taskInfo.dueDate).format("YYYY-MM-DD")
-           : null,
+           : "",
           assignedTo: taskInfo.assignedTo?.map((item) => item?._id) || [],
           todoChecklist: taskInfo.todoChecklist?.map((item) => item?.text) || [],
           attachments: taskInfo.attachments || [],
-        }));
+        });
       }
     }catch(err){
-      console.error("Error fetching users:", err)
+      console.error("Error fetching task:", err)
     }
   };
 
@@ -181,11 +203,11 @@ export default function CreateTask() {
       await axiosInstance.delete(API_PATHS.TASKS.DELETE_TASK(taskId));
 
       setOpenDeleteAlert(false);
-      toast.success("Expense details deleted successfully");
+      toast.success("Task deleted successfully");
       navigate('/admin/tasks')
     }catch(err){
-      console.error("Error deleting expense:",
-        err.response?.data?.message || error.message);
+      console.error("Error deleting task:", err.response?.data?.message || err.message);
+      toast.error("Failed to delete task: " + (err.response?.data?.message || err.message));
     }
   };
 
@@ -193,8 +215,6 @@ export default function CreateTask() {
     if(taskId){
       getTaskDetailsByID(taskId)
     }
-    return () => {
-    };
   }, [taskId])
 
   return (
@@ -268,7 +288,7 @@ export default function CreateTask() {
                 <input
                   placeholder="Create App UI"
                   className="form-input"
-                  value={taskData.dueDate}
+                  value={taskData.dueDate || ""}
                   onChange={({ target }) =>
                     handleValueChange("dueDate", target.value)
                   }

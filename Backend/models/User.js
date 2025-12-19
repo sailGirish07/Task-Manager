@@ -22,7 +22,7 @@ const UserSchema = new mongoose.Schema(
       type: String,
       enum: ["admin", "member"],
       default: "member",
-    }, // Rolr-BasedS
+    }, // Role-Based
   },
   { timestamps: true }
 );

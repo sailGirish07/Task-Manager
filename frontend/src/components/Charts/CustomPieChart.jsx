@@ -5,7 +5,7 @@ import CustomLegend from "./CustomLegend";
 
 export default function CustomPieChart({data, colors}){
     return (
-        <ResponsiveContainer>
+        <ResponsiveContainer width="100%" height={300}>
             <PieChart>
                 <Pie
                 data={data}
