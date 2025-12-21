@@ -122,7 +122,10 @@ export default function EditProfile() {
       
       toast.success("Profile updated successfully");
       
-      // Clear password fields after successful update
+      // Clear all form fields after successful update
+      setFullName("");
+      setEmail("");
+      setProfilePic(null);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");

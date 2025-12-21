@@ -4,7 +4,14 @@ export const API_PATHS = {
   AUTH: {
     REGISTER: "/api/auth/register", // Register a new user (Admin or Member) ok
     LOGIN: "/api/auth/login", // Authenticate user & return JWT token ok
+    VERIFY_LOGIN_CODE: "/api/auth/verify-login-code", // Verify login code and generate token
+    VERIFY_CODE: "/api/auth/verify-code", // Verify user email with code
+    RESEND_CODE: "/api/auth/resend-code", // Resend verification code
+    VERIFY_PASSWORD_RESET_CODE: "/api/auth/verify-password-reset-code", // Verify password reset code
+    FORGOT_PASSWORD: "/api/auth/forgot-password", // Request password reset
+    RESET_PASSWORD: "/api/auth/reset-password", // Reset password with token
     GET_PROFILE: "/api/auth/profile", // Get logged-in user details ok
+    UPDATE_PROFILE: "/api/auth/profile", // Update user profile
   },
 
   USERS: {

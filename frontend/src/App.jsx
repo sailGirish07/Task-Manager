@@ -7,6 +7,13 @@ import UserContext, { UserProvider } from "./context/UserContext"
 
 import Login from './pages/Auth/Login'
 import Signup from './pages/Auth/Signup'
+import VerifyCode from './pages/Auth/VerifyCode'
+import LoginVerify from './pages/Auth/LoginVerify'
+import ResendVerification from './pages/Auth/ResendVerification'
+import EnterPass from './pages/Auth/EnterPass'
+import EnterCode from './pages/Auth/EnterCode'
+import ReEnterPass from './pages/Auth/ReEnterPass'
+import Success from './pages/Auth/Success'
 
 import Dashboard from './pages/Admin/Dashboard'
 import ManageTasks from './pages/Admin/ManageTasks'
@@ -28,6 +35,13 @@ function App() {
           <Routes>
             <Route path='/login' element={<Login/>}/>
             <Route path='/signup' element={<Signup/>}/>
+            <Route path='/verify-code' element={<VerifyCode/>}/>
+            <Route path='/login-verify' element={<LoginVerify/>}/>
+            <Route path='/resend-verification' element={<ResendVerification/>}/>
+            <Route path='/forgot-password' element={<EnterPass/>}/>
+            <Route path='/enter-code' element={<EnterCode/>}/>
+            <Route path='/re-enter-password' element={<ReEnterPass/>}/>
+            <Route path='/reset-success' element={<Success/>}/>
 
             {/* Admin Routes */}
             <Route element={<PrivateRoute allowedRoles={["admin"]} />}>

@@ -1,6 +1,6 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import AuthLayout from "../../components/layouts/AuthLayout";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Input from "../../components/Inputs/Input";
 import { Link } from "react-router-dom";
 import { validateEmail } from "../../utils/helper";
@@ -12,13 +12,47 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [showResendLink, setShowResendLink] = useState(false);
+  const emailRef = useRef(null); // Ref for first input field
 
   const { updateUser } = useContext(UserContext);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for success message from registration or email verification
+  useEffect(() => {
+    // Check for message in location state (from navigation)
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      // Clear the state so message doesn't persist on refresh
+      window.history.replaceState({}, document.title);
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(""), 3000);
+    }
+    
+    // Check if redirected from email verification (comes from backend redirect)
+    const urlParams = new URLSearchParams(location.search);
+    if (urlParams.get('verified') === 'true') {
+      setSuccessMessage("Email verified successfully! Please login within 15 minutes.");
+      // Remove query parameter from URL
+      window.history.replaceState({}, document.title, '/login');
+      // Clear success message after 5 seconds (important message)
+      setTimeout(() => setSuccessMessage(""), 5000);
+    }
+  }, [location.state, location.search]);
+
+  // Focus the first input field on component mount
+  useEffect(() => {
+    if (emailRef.current) {
+      emailRef.current.focus();
+    }
+  }, []);
 
   // Function to clear error and specific form fields
   const clearErrorAndField = (fieldToClear) => {
     setError("");
+    setShowResendLink(false);
     
     // Only clear the specific field that had the error
     switch(fieldToClear) {
@@ -41,19 +75,21 @@ export default function Login() {
 
     if (!validateEmail(email)) {
       setError("Please enter a valid email address");
-      // Clear error message after 1.5 seconds
-      setTimeout(() => clearErrorAndField('email'), 2000);
+      setTimeout(() => setError(""), 2000);
       return;
     }
 
     if (!password) {
       setError("Please enter the password");
-      // Clear error message after 1.5 seconds
-      setTimeout(() => clearErrorAndField('password'), 2000);
+      setTimeout(() => setError(""), 2000);
       return;
     }
 
     setError("");
+    setShowResendLink(false); // Clear resend link on new login attempt
+    
+    // Show immediate loading feedback
+    setSuccessMessage("Processing login...");
 
     try {
       const response = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
@@ -73,16 +109,36 @@ export default function Login() {
         } else {
           navigate("/user/dashboard");
         }
+      } else if (response.data.verificationRequired) {
+        // Show success message and redirect to verification page
+        setSuccessMessage("Verification code sent to your email. Please check your inbox.");
+        // Redirect to verification page after a short delay
+        setTimeout(() => {
+          setSuccessMessage("");
+          navigate("/login-verify", { 
+            state: { 
+              email: response.data.email 
+            } 
+          });
+        }, 2000); // 2 seconds to show message
       }
     } catch (err) {
       if (err.response && err.response.data.message) {
         setError(err.response.data.message);
+        // Show resend link if server indicates it's needed
+        if (err.response.data.resend) {
+          setShowResendLink(true);
+          // Update email from backend if provided
+          if (err.response.data.email) {
+            setEmail(err.response.data.email);
+          }
+        }
       } else {
         setError("Something went wrong. Please try again");
       }
       
-      // Clear error message after 1.5 seconds
-      setTimeout(() => clearErrorAndField(), 2000);
+      // Clear error message after 2 seconds
+      setTimeout(() => setError(""), 2000);
     }
   };
 
@@ -96,6 +152,7 @@ export default function Login() {
 
         <form onSubmit={handleLogin}>
           <Input
+            ref={emailRef}
             value={email}
             onChange={({ target }) => setEmail(target.value)}
             label="Email Address"
@@ -110,11 +167,36 @@ export default function Login() {
             placeholder="Min 8 characters"
             type="password"
           />
+          
+          <div className="text-right mb-4">
+            <Link 
+              to="/forgot-password" 
+              className="text-primary text-sm underline"
+            >
+              Forgot Password?
+            </Link>
+          </div>
 
+          {successMessage && (
+            <p className="text-green-500 text-xs pb-2.5">{successMessage}</p>
+          )}
           {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}
-          <button type="submit" className="btn-primary">
-            Login
-          </button>
+          {showResendLink && (
+            <p className="text-xs pb-2.5">
+              <Link 
+                to="/resend-verification" 
+                state={{ email: email }}
+                className="text-primary underline"
+              >
+                Resend verification code
+              </Link>
+            </p>
+          )}
+          <div className="flex justify-between items-center mt-2">
+            <button type="submit" className="btn-primary">
+              Login
+            </button>
+          </div>
 
           <p className="text-[13px] text-slate-800 mt-3">
             Don't have an account?{" "}

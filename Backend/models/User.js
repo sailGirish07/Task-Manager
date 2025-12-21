@@ -23,6 +23,26 @@ const UserSchema = new mongoose.Schema(
       enum: ["admin", "member"],
       default: "member",
     }, // Role-Based
+    verified: {
+      type: Boolean,
+      default: false,
+    },
+    verifiedAt: {
+      type: Date,
+      default: null,
+    },
+    verificationCode: {
+      type: String,
+    },
+    codeExpires: {
+      type: Date,
+    },
+    resetPasswordToken: {
+      type: String,
+    },
+    resetPasswordExpires: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );

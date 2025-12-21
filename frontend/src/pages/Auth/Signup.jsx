@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AuthLayout from "../../components/layouts/AuthLayout";
 import ProfilePhotoSelector from "../../components/Inputs/ProfilePhotoSelector";
 import Input from "../../components/Inputs/Input";
@@ -18,13 +18,50 @@ export default function Signup() {
   const [adminInviteToken, setAdminInviteToken] = useState("");
 
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [passwordStrength, setPasswordStrength] = useState(0); // 0-5 scale for password strength
+  const firstNameRef = useRef(null); // Ref for first input field
+
+  // Common passwords to prevent
+  const commonPasswords = [
+    'password', '12345678', 'qwertyui', 'password123', 'admin123',
+    'welcome1', 'letmein1', 'monkey12', 'dragon12', 'master12',
+    'Password1', 'Password1!', '123456789', 'qwerty123', 'abc123'
+  ];
 
   const {updateUser} = useContext(UserContext)
     const navigate = useNavigate();
 
+  // Calculate password strength in real-time
+  useEffect(() => {
+    if (password) {
+      let strength = 0;
+      if (password.length >= 8) strength++;
+      if (/[A-Z]/.test(password)) strength++;
+      if (/[a-z]/.test(password)) strength++;
+      if (/[0-9]/.test(password)) strength++;
+      if (/[^A-Za-z0-9]/.test(password)) strength++;
+      
+      // Bonus point for longer passwords
+      if (password.length >= 12) strength++;
+      
+      setPasswordStrength(Math.min(strength, 5));
+    } else {
+      setPasswordStrength(0);
+    }
+  }, [password]);
+
+  // Focus the first input field on component mount
+  useEffect(() => {
+    if (firstNameRef.current) {
+      firstNameRef.current.focus();
+    }
+  }, []);
+
   // Function to clear error and specific form fields
   const clearErrorAndField = (fieldToClear) => {
     setError("");
+    setSuccessMessage("");
     
     // Only clear the specific field that had the error
     switch(fieldToClear) {
@@ -61,26 +98,64 @@ export default function Signup() {
 
     if (!fullName) {
       setError("Please enter full name");
-      // Clear error message after 1.5 seconds
-      setTimeout(() => clearErrorAndField('fullName'), 2000);
+      setTimeout(() => setError(""), 2000);
+      return;
+    }
+    
+    // Validate full name: only A-Z, a-z, and spaces
+    const nameRegex = /^[A-Za-z ]+$/;
+    if (!nameRegex.test(fullName)) {
+      setError("Full name can only contain letters (A-Z, a-z) and spaces");
+      setTimeout(() => setError(""), 2000);
       return;
     }
 
     if (!validateEmail(email)) {
-      setError("Please enter  a valide email address");
-      // Clear error message after 1.5 seconds
-      setTimeout(() => clearErrorAndField('email'), 2000);
+      setError("Please enter a valid email address");
+      setTimeout(() => setError(""), 2000);
+      return;
+    }
+    
+    // Additional email validation: a-z, A-Z, 0-9, @, starts with lowercase letter, no spaces
+    const emailRegex = /^[a-z][a-zA-Z0-9]*@[a-zA-Z0-9]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      setError("Email must start with lowercase letter, contain only letters/numbers/@, and no spaces");
+      setTimeout(() => setError(""), 2000);
       return;
     }
 
     if (!password) {
       setError("Please enter the password");
-      // Clear error message after 1.5 seconds
-      setTimeout(() => clearErrorAndField('password'), 2000);
+      setTimeout(() => setError(""), 2000);
+      return;
+    }
+    
+    // Validate password: min 8 chars, at least 1 uppercase, 1 lowercase, 1 digit, 1 special char, no spaces
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d\s]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      setError("Password must be at least 8 chars with uppercase, lowercase, digit, special char, no spaces");
+      setTimeout(() => setError(""), 2000);
+      return;
+    }
+    
+    // Check for common passwords
+    if (commonPasswords.includes(password.toLowerCase())) {
+      setError("Please choose a stronger password. This password is too common.");
+      setTimeout(() => setError(""), 2000);
+      return;
+    }
+    
+    // Check password strength - must be at least medium (3/5)
+    if (passwordStrength < 3) {
+      setError("Password is too weak. Please choose a stronger password.");
+      setTimeout(() => setError(""), 2000);
       return;
     }
 
     setError("");
+    
+    // Show immediate loading feedback
+    setSuccessMessage("Processing registration...");
 
        try{
 
@@ -97,30 +172,33 @@ export default function Signup() {
             adminInviteToken
           });
 
-          const {token, role} = response.data;
-
-          if(token){
-            localStorage.setItem("token", token);
-            updateUser(response.data)
-
-            //Redirect based on the role
-            if(role === "admin"){
-              navigate("/admin/dashboard");
-
-            }else{
-              navigate("/user/dashboard");
-            }
-          }
+          // Show success message for email verification
+          setSuccessMessage("Registration successful! You can now login.");
+          // Clear success message after 2 seconds
+          setTimeout(() => {
+            setSuccessMessage("");
+            // Redirect to login page
+            navigate("/login");
+          }, 2000);
+          // Clear form fields
+          setFullName("");
+          setEmail("");
+          setPassword("");
+          setAdminInviteToken("");
+          setProfilePic(null);
 
         }catch(err){
+          // Clear success message if there was one
+          setSuccessMessage("");
+          
           if(err.response && err.response.data.message){
             setError(err.response.data.message);
           }else{
             setError("Something went wrong. Please try again")
           }
           
-          // Clear error message after 1.5 seconds
-          setTimeout(() => clearErrorAndField(), 2000);
+          // Clear error message after 2 seconds
+          setTimeout(() => setError(""), 2000);
         }
 
   };
@@ -137,6 +215,7 @@ export default function Signup() {
           <ProfilePhotoSelector image={profilePic} setImage={setProfilePic} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
+              ref={firstNameRef}
               value={fullName}
               onChange={({ target }) => setFullName(target.value)}
               label="Full Name"
@@ -159,6 +238,39 @@ export default function Signup() {
               placeholder="Min 8 characters"
               type="password"
             />
+            {/* Password strength indicator */}
+            {password && (
+              <div className="mb-4">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Password Strength:</span>
+                  <span className={
+                    passwordStrength <= 1 ? "text-red-500 font-medium" :
+                    passwordStrength <= 3 ? "text-yellow-500 font-medium" :
+                    "text-green-500 font-medium"
+                  }>
+                    {passwordStrength <= 1 ? "Weak" :
+                     passwordStrength <= 3 ? "Medium" :
+                     "Strong"}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ease-in-out ${
+                      passwordStrength <= 1 ? "bg-red-500" :
+                      passwordStrength <= 3 ? "bg-yellow-500" :
+                      "bg-green-500"
+                    }`} 
+                    style={{ width: `${(passwordStrength / 5) * 100}%` }}
+                  ></div>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {passwordStrength <= 1 && "Add uppercase, number, and special character"}
+                  {passwordStrength === 2 && "Good start! Add more character types"}
+                  {passwordStrength === 3 && "Almost there! Try a longer password"}
+                  {passwordStrength >= 4 && "Great password!"}
+                </div>
+              </div>
+            )}
 
             <Input
               value={adminInviteToken}
@@ -169,6 +281,7 @@ export default function Signup() {
             />
           </div>
           {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}
+          {successMessage && <p className="text-green-500 text-xs pb-2.5">{successMessage}</p>}
           <button type="submit" className="btn-primary">
             Signup
           </button>
