@@ -127,6 +127,7 @@ const getUserProfile = async (req, res) => {
   }
 };
 
+/*
 const updateUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -156,6 +157,7 @@ const updateUserProfile = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+*/
 
 // Verify email with code
 const verifyCode = async (req, res) => {
@@ -447,4 +449,4 @@ const verifyPasswordResetCode = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, verifyCode, resendVerificationEmail, verifyLoginCode, forgotPassword, resetPassword, verifyPasswordResetCode };
+module.exports = { registerUser, loginUser, getUserProfile, /*updateUserProfile,*/ verifyCode, resendVerificationEmail, verifyLoginCode, forgotPassword, resetPassword, verifyPasswordResetCode };

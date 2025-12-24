@@ -11,11 +11,13 @@ export const API_PATHS = {
     FORGOT_PASSWORD: "/api/auth/forgot-password", // Request password reset
     RESET_PASSWORD: "/api/auth/reset-password", // Reset password with token
     GET_PROFILE: "/api/auth/profile", // Get logged-in user details ok
-    UPDATE_PROFILE: "/api/auth/profile", // Update user profile
+    // UPDATE_PROFILE: "/api/auth/profile", // Update user profile
   },
 
   USERS: {
     GET_ALL_USERS: "/api/users", // Get all users (Admin only)   ok
+    GET_ALL_USERS_FOR_MESSAGING: "/api/users/messaging/all", // Get all users for messaging (All authenticated users)
+    GET_ONLINE_STATUS: "/api/users/online-status", // Get online users
     GET_USER_BY_ID: (userId) => `/api/users/${userId}`, // Get user by ID   ok
     CREATE_USER: "/api/users", // Create a new user (Admin only)    No Functional
     UPDATE_USER: (userId) => `/api/users/${userId}`, // Update user details   ok
@@ -43,5 +45,32 @@ export const API_PATHS = {
 
   IMAGE: {
     UPLOAD_IMAGE: "/api/auth/upload-image",  // ok (Gives an link to set the profileImage)
+  },
+
+  NOTIFICATIONS: {
+    GET_ALL: "/api/notifications", // Get all notifications
+    MARK_AS_READ: (id) => `/api/notifications/${id}/read`, // Mark notification as read
+    MARK_ALL_AS_READ: "/api/notifications/all/read", // Mark all notifications as read
+    DELETE: (id) => `/api/notifications/${id}`, // Delete notification
+  },
+
+  MESSAGES: {
+    // Direct messaging
+    SEND_DIRECT_MESSAGE: "/api/messages/direct", // Send direct message
+    GET_DIRECT_MESSAGES: (userId) => `/api/messages/direct/${userId}`, // Get direct messages with user
+    MARK_MESSAGES_AS_READ: "/api/messages/direct/read", // Mark direct messages as read
+    UPDATE_MESSAGE_STATUS: "/api/messages/direct/delivered", // Update message status to delivered
+    
+    // Group messaging
+    SEND_GROUP_MESSAGE: "/api/messages/group", // Send group message
+    GET_GROUP_MESSAGES: (groupId) => `/api/messages/group/${groupId}`, // Get group messages
+    GET_GROUPS: "/api/messages/groups", // Get user's groups
+    CREATE_GROUP: "/api/messages/groups", // Create a new group
+    ADD_MEMBER_TO_GROUP: (groupId, userId) => `/api/messages/groups/${groupId}/members/${userId}`, // Add member to group
+    REMOVE_MEMBER_FROM_GROUP: (groupId, userId) => `/api/messages/groups/${groupId}/members/${userId}`, // Remove member from group
+    DELETE_MESSAGE: (messageId) => `/api/messages/${messageId}`, // Delete a message
+    
+    // Conversations
+    GET_CONVERSATIONS: "/api/messages/conversations", // Get user's conversations
   },
 };

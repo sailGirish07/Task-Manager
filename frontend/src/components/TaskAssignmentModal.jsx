@@ -1,0 +1,76 @@
+import React, { useState } from "react";
+import { LuX, LuUser, LuUsers } from "react-icons/lu";
+
+const TaskAssignmentModal = ({ isOpen, onClose }) => {
+  const [activeTab, setActiveTab] = useState('personal'); // 'personal' or 'groups'
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-lime-300 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl h-3/4 flex flex-col border-2 border-gray-300">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium">Messages</h3>
+          <button 
+            onClick={onClose} 
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <LuX className="text-xl" />
+          </button>
+        </div>
+
+        {/* Tabs for Personal and Groups */}
+        <div className="flex gap-2 mb-4">
+          <button 
+            className={`px-4 py-2 rounded-lg font-medium ${
+              activeTab === 'personal' 
+                ? 'bg-blue-100 text-blue-700' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            onClick={() => setActiveTab('personal')}
+          >
+            <LuUser className="inline mr-2" />
+            Personal
+          </button>
+          <button 
+            className={`px-4 py-2 rounded-lg font-medium ${
+              activeTab === 'groups' 
+                ? 'bg-blue-100 text-blue-700' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            onClick={() => setActiveTab('groups')}
+          >
+            <LuUsers className="inline mr-2" />
+            Groups
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-3 border-b">
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder={activeTab === 'personal' ? "Search users..." : "Search groups..."} 
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="p-4">
+            {/* Content will be loaded based on active tab */}
+            <div className="text-center text-gray-500 py-8">
+              {activeTab === 'personal' 
+                ? 'Search for users to message' 
+                : 'Search for groups to message'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TaskAssignmentModal;

@@ -1,5 +1,5 @@
 const express = require("express");
-const {registerUser, loginUser, getUserProfile, updateUserProfile, verifyCode, resendVerificationEmail, verifyLoginCode, forgotPassword, resetPassword, verifyPasswordResetCode} = require('../controllers/authController')
+const {registerUser, loginUser, getUserProfile, /*updateUserProfile,*/ verifyCode, resendVerificationEmail, verifyLoginCode, forgotPassword, resetPassword, verifyPasswordResetCode} = require('../controllers/authController')
 const {protect} = require('../middlewares/authMiddleware')
 const { imageUpload } = require("../middlewares/uploadMiddleware");
 
@@ -13,7 +13,7 @@ router.post("/verify-code", verifyCode); // Verify Email with Code
 router.post("/resend-code", resendVerificationEmail); // Resend Verification Code
 router.post("/verify-password-reset-code", verifyPasswordResetCode); // Verify Password Reset Code
 router.get("/profile", protect, getUserProfile); // Get User Profile
-router.put("/profile", protect, updateUserProfile); // Update Profile
+// router.put("/profile", protect, updateUserProfile); // Update Profile
 router.post("/forgot-password", forgotPassword); // Request password reset
 router.post("/reset-password", resetPassword); // Reset password with token
 

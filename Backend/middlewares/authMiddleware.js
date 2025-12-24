@@ -10,6 +10,10 @@ const protect = async (req, res, next) => {
       token = token.split(" ")[1]; // Extract token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = await User.findById(decoded.id).select("-password");
+      
+      // Update lastActive timestamp for online status tracking
+      await User.findByIdAndUpdate(decoded.id, { lastActive: new Date() });
+      
       next();
     } else {
       res.status(401).json({ message: "Not authorized, no token" });

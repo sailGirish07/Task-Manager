@@ -31,12 +31,12 @@ export const SIDE_MENU_DATA = [
     icon: LuUsers,
     path: "/admin/users",
   },
-  {
+  /* {
     id: "05",
     label: "Edit Profile",
     icon: LuUsers,
     path: "/admin/edit-profile",
-  },
+  }, */
   {
     id: "06",
     label: "Logout",
@@ -58,12 +58,12 @@ export const SIDE_MENU_USER_DATA = [
     icon: LuClipboardCheck,
     path: "/user/tasks",
   },
-  {
+  /* {
     id: "03",
     label: "Edit Profile",
     icon: LuUsers,
     path: "/user/edit-profile",
-  },
+  }, */
   {
     id: "04",
     label: "Logout",

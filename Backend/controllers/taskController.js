@@ -1,4 +1,5 @@
 const Task = require("../models/Task");
+const Notification = require("../models/Notification");
 
 const createTask = async (req, res) => {
   try {
@@ -65,6 +66,18 @@ const createTask = async (req, res) => {
       todoChecklist,
       attachments,
     });
+
+    // Create notification for each assigned user
+    for (const userId of assignedTo) {
+      await Notification.create({
+        userId: userId,
+        title: `New Task Assigned: ${title}`,
+        message: `A new task "${title}" has been assigned to you by ${req.user.name}.`,
+        type: "task_assignment",
+        relatedId: task._id,
+        relatedModel: "Task",
+      });
+    }
 
     res.status(201).json({ message: "Task created successfully", task });
   } catch (err) {
@@ -235,10 +248,43 @@ const updateTask = async (req, res) => {
           .json({ message: "Task must be assigned to at least one user" });
       }
 
+      // Check if assignedTo has changed
+      const previousAssignedTo = task.assignedTo;
       task.assignedTo = req.body.assignedTo;
+
+      // Create notification for newly assigned users
+      const newAssignments = req.body.assignedTo.filter(
+        (userId) => !previousAssignedTo.includes(userId)
+      );
+      for (const userId of newAssignments) {
+        await Notification.create({
+          userId: userId,
+          title: `Task Reassigned: ${task.title}`,
+          message: `You have been assigned to task "${task.title}" by ${req.user.name}.`,
+          type: "task_assignment",
+          relatedId: task._id,
+          relatedModel: "Task",
+        });
+      }
     }
 
     await task.save();
+    
+    // Create notification for task updates to all assigned users
+    for (const assignedUser of task.assignedTo) {
+      const userId = assignedUser._id || assignedUser; // Handle both populated and non-populated user references
+      if (req.user._id.toString() !== userId.toString()) { // Don't notify the user who made the change
+        await Notification.create({
+          userId: userId,
+          title: `Task Updated: ${task.title}`,
+          message: `Task "${task.title}" has been updated by ${req.user.name}.`,
+          type: "task_update",
+          relatedId: task._id,
+          relatedModel: "Task",
+        });
+      }
+    }
+
     res.json({ task });
   } catch (err) {
     console.error("Error updating task:", err);
@@ -332,6 +378,30 @@ const updateTaskStatus = async (req, res) => {
     }
 
     await task.save();
+    
+    // Create notification for status update for all assigned users
+    for (const assignedUser of task.assignedTo) {
+      const userId = assignedUser._id || assignedUser; // Handle both populated and non-populated user references
+      await Notification.create({
+        userId: userId,
+        title: `Task Status Updated: ${task.title}`,
+        message: `Task "${task.title}" status has been updated to ${newStatus} by ${req.user.name}.`,
+        type: "task_update",
+        relatedId: task._id,
+        relatedModel: "Task",
+      });
+    }
+    
+    // Create notification for the task creator (admin) when status changes
+    await Notification.create({
+      userId: task.createdBy,
+      title: `Status Update: ${task.title}`,
+      message: `Task "${task.title}" status has been updated to ${newStatus} by ${req.user.name}.`,
+      type: "task_update",
+      relatedId: task._id,
+      relatedModel: "Task",
+    });
+    
     res.json({ task });
   } catch (err) {
     console.error("Error updating task status:", err);
@@ -381,6 +451,30 @@ const updateTaskChecklist = async (req, res) => {
     }
 
     await task.save();
+    
+    // Create notification for checklist update for all assigned users
+    for (const assignedUser of task.assignedTo) {
+      const userId = assignedUser._id || assignedUser; // Handle both populated and non-populated user references
+      await Notification.create({
+        userId: userId,
+        title: `Task Checklist Updated: ${task.title}`,
+        message: `Task "${task.title}" checklist has been updated by ${req.user.name}.`,
+        type: "task_update",
+        relatedId: task._id,
+        relatedModel: "Task",
+      });
+    }
+    
+    // Create notification for the task creator (admin) when checklist changes
+    await Notification.create({
+      userId: task.createdBy,
+      title: `Checklist Update: ${task.title}`,
+      message: `Task "${task.title}" checklist has been updated by ${req.user.name}.`,
+      type: "task_update",
+      relatedId: task._id,
+      relatedModel: "Task",
+    });
+    
     res.json({ task });
   } catch (err) {
     res.status(500).json({ message: "Server Error", error: err.message });
