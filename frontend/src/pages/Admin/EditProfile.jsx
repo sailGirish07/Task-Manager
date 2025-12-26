@@ -92,7 +92,7 @@ export default function EditProfile() {
           const imgUploadRes = await uploadImage(profilePic);
           profileImageUrl = imgUploadRes.imageUrl || "";
         } catch (err) {
-          setError("Failed to upload profile image");
+          setError("Failed to upload profile image: " + err.message);
           setTimeout(() => clearErrorAndField(), 2000);
           setLoading(false);
           return;

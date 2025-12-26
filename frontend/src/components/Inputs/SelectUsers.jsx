@@ -52,7 +52,7 @@ export default function SelectUsers({selectedUsers, setSelectedUsers}) {
       setTempSelectedUsers(selectedUsers);
 
       return () => {};
-    }, [selectedUsers, isModalOpen]);
+    }, [selectedUsers]);
 
 
   return (

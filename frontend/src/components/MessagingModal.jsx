@@ -1493,7 +1493,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                           {/* Remove button for group creator only (but not for themselves) */}
                           {user && groups.find(g => g._id === selectedChat.id)?.createdBy === user._id && 
                            groups.find(g => g._id === selectedChat.id)?.createdBy !== member._id && 
-                           member._id !== user._id && (
+                           !isCurrentUser && (
                             <button
                               onClick={async () => {
                                 if (window.confirm(`Are you sure you want to remove ${member.name} from the group?`)) {
