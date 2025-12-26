@@ -54,19 +54,7 @@ const Notifications = () => {
     }
   };
 
-  // Mark all notifications as read
-  const markAllAsRead = async () => {
-    try {
-      await axiosInstance.put(API_PATHS.NOTIFICATIONS.MARK_ALL_AS_READ);
-      // Update local state
-      setNotifications(prev => 
-        prev.map(notification => ({ ...notification, read: true }))
-      );
-      setUnreadCount(0);
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
-  };
+
 
   // Delete notification
   const deleteNotification = async (id) => {
@@ -109,22 +97,6 @@ const Notifications = () => {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b">
               <h2 className="text-xl font-semibold text-gray-900">Notifications</h2>
-              <div className="flex items-center gap-3">
-                {unreadCount > 0 && (
-                  <button
-                    onClick={markAllAsRead}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    Mark all as read
-                  </button>
-                )}
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <LuX className="text-xl" />
-                </button>
-              </div>
             </div>
 
             {/* Loading state */}

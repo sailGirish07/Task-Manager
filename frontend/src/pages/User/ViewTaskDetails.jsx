@@ -41,7 +41,7 @@ export default function ViewTaskDetails() {
 
   //Handle todo check
   const updateTodoCheckList = async (index) => {
-    const todoChecklist = [...task?.todoChecklist];
+    const todoChecklist = [...(task?.todoChecklist || [])];
     const taskId = id;
 
     if(todoChecklist && todoChecklist[index]){
@@ -58,7 +58,7 @@ export default function ViewTaskDetails() {
           //Optionally revert the toggle if the API call fails
           todoChecklist[index].completed = !todoChecklist[index].completed;
         }
-      }catch(err){
+      }catch{
         todoChecklist[index].completed = !todoChecklist[index].completed;
       }
     }
@@ -73,9 +73,14 @@ export default function ViewTaskDetails() {
   };
 
   useEffect(() => {
-    if (id) {
-      getTaskDetailsByID();
-    }
+    const fetchData = async () => {
+      if (id) {
+        await getTaskDetailsByID();
+      }
+    };
+    
+    fetchData();
+    
     return () => {};
   }, [id]);
 

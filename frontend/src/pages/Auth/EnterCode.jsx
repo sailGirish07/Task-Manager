@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
@@ -75,7 +75,7 @@ export default function EnterCode() {
     setError("");
 
     try {
-      const response = await axiosInstance.post(API_PATHS.AUTH.FORGOT_PASSWORD, { email });
+      await axiosInstance.post(API_PATHS.AUTH.FORGOT_PASSWORD, { email });
       setCountdown(60); // Reset countdown
     } catch (err) {
       if (err.response && err.response.data.message) {

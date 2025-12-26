@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function InfoCard({icon, label, value, color}){
+export default function InfoCard({label, value, color}){
     return (
         <div className="flex items-center gap-3">
             <div className={`w-2 md:w-2 h-3 md:h-5 ${color} rounded-full`}/>

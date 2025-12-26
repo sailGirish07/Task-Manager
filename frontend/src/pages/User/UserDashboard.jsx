@@ -67,7 +67,11 @@ export default function UserDashboard() {
   }
 
   useEffect(() => {
-    getDashboardData();
+    const fetchData = async () => {
+      await getDashboardData();
+    };
+    
+    fetchData();
 
     return () => {};
   }, []);

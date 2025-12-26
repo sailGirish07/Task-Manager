@@ -207,7 +207,11 @@ export default function ManageTasks() {
   };
 
   useEffect(() => {
-    getAllTasks();
+    const fetchTasks = async () => {
+      await getAllTasks();
+    };
+    
+    fetchTasks();
   }, [filterStatus]);
 
   return (
@@ -229,14 +233,14 @@ export default function ManageTasks() {
             </button>
           </div>
 
-          {allTasks.length > 0 && (
-            <div className="flex items-center gap-3">
-              <TaskStatusTabs
-                tabs={tabs}
-                activeTab={filterStatus}
-                setActiveTab={setFilterStatus}
-              />
+          <div className="flex items-center gap-3">
+            <TaskStatusTabs
+              tabs={tabs}
+              activeTab={filterStatus}
+              setActiveTab={setFilterStatus}
+            />
 
+            {allTasks.length > 0 && (
               <button
                 className="hidden lg:flex download-btn"
                 onClick={handleDownloadReport}
@@ -244,8 +248,8 @@ export default function ManageTasks() {
                 <LuFileSpreadsheet className="text-lg" />
                 Download Report
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
         </div> {/* ✅ FIXED: Properly closed */}
 

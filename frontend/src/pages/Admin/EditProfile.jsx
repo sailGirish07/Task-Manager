@@ -14,7 +14,7 @@ export default function EditProfile() {
   const [profilePic, setProfilePic] = useState(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [currentPassword, setCurrentPassword] = useState("");
+
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,9 +40,7 @@ export default function EditProfile() {
       case 'email':
         setEmail("");
         break;
-      case 'currentPassword':
-        setCurrentPassword("");
-        break;
+
       case 'newPassword':
         setNewPassword("");
         break;
@@ -53,7 +51,6 @@ export default function EditProfile() {
         // If no specific field, clear all fields
         setFullName("");
         setEmail("");
-        setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
     }
@@ -94,8 +91,8 @@ export default function EditProfile() {
         try {
           const imgUploadRes = await uploadImage(profilePic);
           profileImageUrl = imgUploadRes.imageUrl || "";
-        } catch (uploadErr) {
-          setError("Failed to upload profile image");
+        } catch (err) {
+          setError("Failed to upload profile image: " + err.message);
           setTimeout(() => clearErrorAndField(), 2000);
           setLoading(false);
           return;
@@ -126,7 +123,6 @@ export default function EditProfile() {
       setFullName("");
       setEmail("");
       setProfilePic(null);
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       

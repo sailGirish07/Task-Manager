@@ -41,14 +41,18 @@ export default function SelectUsers({selectedUsers, setSelectedUsers}) {
     .map((user) => user.profileImageUrl);
 
     useEffect(() => {
-      getAllUsers();
+      const fetchUsers = async () => {
+        await getAllUsers();
+      };
+      
+      fetchUsers();
     }, []);
 
     useEffect(() => {
       setTempSelectedUsers(selectedUsers);
 
       return () => {};
-    }, [selectedUsers, isModalOpen]);
+    }, [selectedUsers]);
 
 
   return (

@@ -68,7 +68,7 @@ export default function CreateTask() {
         completed : false,
       }));
 
-      const response = await axiosInstance.post(API_PATHS.TASKS.CREATE_TASK, {
+      await axiosInstance.post(API_PATHS.TASKS.CREATE_TASK, {
         ...taskData,
         dueDate: dueDateObj.toISOString(),
         todoChecklist: todolist,
@@ -107,7 +107,7 @@ export default function CreateTask() {
         };
       });
 
-      const response = await axiosInstance.put(
+      await axiosInstance.put(
         API_PATHS.TASKS.UPDATE_TASK(taskId),
         {
           ...taskData,

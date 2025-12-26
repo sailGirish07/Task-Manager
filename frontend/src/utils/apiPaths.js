@@ -11,7 +11,7 @@ export const API_PATHS = {
     FORGOT_PASSWORD: "/api/auth/forgot-password", // Request password reset
     RESET_PASSWORD: "/api/auth/reset-password", // Reset password with token
     GET_PROFILE: "/api/auth/profile", // Get logged-in user details ok
-    // UPDATE_PROFILE: "/api/auth/profile", // Update user profile
+    UPDATE_PROFILE: "/api/auth/profile", // Update user profile
   },
 
   USERS: {
@@ -72,5 +72,6 @@ export const API_PATHS = {
     
     // Conversations
     GET_CONVERSATIONS: "/api/messages/conversations", // Get user's conversations
+    GET_GROUP_CONVERSATIONS: "/api/messages/group-conversations", // Get user's group conversations
   },
 };
