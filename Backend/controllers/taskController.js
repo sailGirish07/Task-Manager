@@ -70,7 +70,8 @@ const createTask = async (req, res) => {
     // Create notification for each assigned user
     for (const userId of assignedTo) {
       await Notification.create({
-        userId: userId,
+        recipient: userId, // Required field
+        userId: userId,   // Also include for consistency
         title: `New Task Assigned: ${title}`,
         message: `A new task "${title}" has been assigned to you by ${req.user.name}.`,
         type: "task_assignment",
@@ -258,7 +259,8 @@ const updateTask = async (req, res) => {
       );
       for (const userId of newAssignments) {
         await Notification.create({
-          userId: userId,
+          recipient: userId, // Required field
+          userId: userId,   // Also include for consistency
           title: `Task Reassigned: ${task.title}`,
           message: `You have been assigned to task "${task.title}" by ${req.user.name}.`,
           type: "task_assignment",
@@ -275,7 +277,8 @@ const updateTask = async (req, res) => {
       const userId = assignedUser._id || assignedUser; // Handle both populated and non-populated user references
       if (req.user._id.toString() !== userId.toString()) { // Don't notify the user who made the change
         await Notification.create({
-          userId: userId,
+          recipient: userId, // Required field
+          userId: userId,   // Also include for consistency
           title: `Task Updated: ${task.title}`,
           message: `Task "${task.title}" has been updated by ${req.user.name}.`,
           type: "task_update",
@@ -383,7 +386,8 @@ const updateTaskStatus = async (req, res) => {
     for (const assignedUser of task.assignedTo) {
       const userId = assignedUser._id || assignedUser; // Handle both populated and non-populated user references
       await Notification.create({
-        userId: userId,
+        recipient: userId, // Required field
+        userId: userId,   // Also include for consistency
         title: `Task Status Updated: ${task.title}`,
         message: `Task "${task.title}" status has been updated to ${newStatus} by ${req.user.name}.`,
         type: "task_update",
@@ -394,7 +398,8 @@ const updateTaskStatus = async (req, res) => {
     
     // Create notification for the task creator (admin) when status changes
     await Notification.create({
-      userId: task.createdBy,
+      recipient: task.createdBy, // Required field
+      userId: task.createdBy,   // Also include for consistency
       title: `Status Update: ${task.title}`,
       message: `Task "${task.title}" status has been updated to ${newStatus} by ${req.user.name}.`,
       type: "task_update",
@@ -456,7 +461,8 @@ const updateTaskChecklist = async (req, res) => {
     for (const assignedUser of task.assignedTo) {
       const userId = assignedUser._id || assignedUser; // Handle both populated and non-populated user references
       await Notification.create({
-        userId: userId,
+        recipient: userId, // Required field
+        userId: userId,   // Also include for consistency
         title: `Task Checklist Updated: ${task.title}`,
         message: `Task "${task.title}" checklist has been updated by ${req.user.name}.`,
         type: "task_update",
@@ -467,7 +473,8 @@ const updateTaskChecklist = async (req, res) => {
     
     // Create notification for the task creator (admin) when checklist changes
     await Notification.create({
-      userId: task.createdBy,
+      recipient: task.createdBy, // Required field
+      userId: task.createdBy,   // Also include for consistency
       title: `Checklist Update: ${task.title}`,
       message: `Task "${task.title}" checklist has been updated by ${req.user.name}.`,
       type: "task_update",

@@ -5,6 +5,7 @@ const {
   getDirectMessages,
   getGroupMessages,
   getUserConversations,
+  getUserGroupConversations,
   getUserGroups,
   createGroup,
   addMemberToGroup,
@@ -30,9 +31,10 @@ router.get("/groups", protect, getUserGroups); // Get user's groups
 router.post("/groups", protect, createGroup); // Create a new group
 router.put("/groups/:groupId/members/:userId", protect, addMemberToGroup); // Add member to group
 router.delete("/groups/:groupId/members/:userId", protect, removeMemberFromGroup); // Remove member from group
-router.delete("/messages/:messageId", protect, deleteMessage); // Delete a message
+router.delete("/:messageId", protect, deleteMessage); // Delete a message
 
 // Conversations
 router.get("/conversations", protect, getUserConversations); // Get user's conversations
+router.get("/group-conversations", protect, getUserGroupConversations); // Get user's group conversations
 
 module.exports = router;

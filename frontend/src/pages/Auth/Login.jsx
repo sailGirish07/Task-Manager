@@ -49,25 +49,7 @@ export default function Login() {
     }
   }, []);
 
-  // Function to clear error and specific form fields
-  const clearErrorAndField = (fieldToClear) => {
-    setError("");
-    setShowResendLink(false);
-    
-    // Only clear the specific field that had the error
-    switch(fieldToClear) {
-      case 'email':
-        setEmail("");
-        break;
-      case 'password':
-        setPassword("");
-        break;
-      default:
-        // If no specific field, clear all fields
-        setEmail("");
-        setPassword("");
-    }
-  };
+
 
   //Handle login form submit
   const handleLogin = async (e) => {

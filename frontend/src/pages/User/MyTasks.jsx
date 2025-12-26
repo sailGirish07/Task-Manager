@@ -75,8 +75,12 @@ export default function MyTask() {
   // };
 
   useEffect(() => {
-    getAllTasks();
-  }, [filterStatus]);
+    const fetchData = async () => {
+      await getAllTasks();
+    };
+    
+    fetchData();
+  }, [filterStatus, getAllTasks]);
 
   return (
     <DashboardLayout activeMenu="My Tasks">
@@ -85,18 +89,16 @@ export default function MyTask() {
           <h2 className="text-xl md:text-xl font-medium">
             My Tasks
           </h2>
-          {tabs?.[0]?.count > 0 && (
-            <TaskStatusTabs
+          <TaskStatusTabs
             tabs={tabs}
             activeTab={filterStatus}
             setActiveTab={setFilterStatus}
           />
-          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           {allTasks.length > 0 ? (
-            allTasks.map((item, index) => (
+            allTasks.map((item) => (
               <TaskCard
               key={item._id}
               title={item.title}

@@ -5,7 +5,7 @@ import Input from "../../components/Inputs/Input";
 import { Link, useNavigate } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
-import { useContext } from "react";
+
 import uploadImage from "../../utils/uploadImage";
 import UserContext from "../../context/UserContext";
 import { validateEmail } from "../../utils/helper";
@@ -29,13 +29,12 @@ export default function Signup() {
     'Password1', 'Password1!', '123456789', 'qwerty123', 'abc123'
   ];
 
-  const {updateUser} = useContext(UserContext)
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
   // Calculate password strength in real-time
   useEffect(() => {
+    let strength = 0;
     if (password) {
-      let strength = 0;
       if (password.length >= 8) strength++;
       if (/[A-Z]/.test(password)) strength++;
       if (/[a-z]/.test(password)) strength++;
@@ -44,11 +43,9 @@ export default function Signup() {
       
       // Bonus point for longer passwords
       if (password.length >= 12) strength++;
-      
-      setPasswordStrength(Math.min(strength, 5));
-    } else {
-      setPasswordStrength(0);
     }
+    
+    setPasswordStrength(Math.min(strength, 5));
   }, [password]);
 
   // Focus the first input field on component mount
@@ -58,37 +55,7 @@ export default function Signup() {
     }
   }, []);
 
-  // Function to clear error and specific form fields
-  const clearErrorAndField = (fieldToClear) => {
-    setError("");
-    setSuccessMessage("");
-    
-    // Only clear the specific field that had the error
-    switch(fieldToClear) {
-      case 'fullName':
-        setFullName("");
-        break;
-      case 'email':
-        setEmail("");
-        break;
-      case 'password':
-        setPassword("");
-        break;
-      case 'adminInviteToken':
-        setAdminInviteToken("");
-        break;
-      case 'profilePic':
-        setProfilePic(null);
-        break;
-      default:
-        // If no specific field, clear all fields
-        setFullName("");
-        setEmail("");
-        setPassword("");
-        setAdminInviteToken("");
-        setProfilePic(null);
-    }
-  };
+
 
   //Handle signup form submt
   const handleSignup = async (e) => {
@@ -164,7 +131,7 @@ export default function Signup() {
           const imgUploadRes = await uploadImage(profilePic);
           profileImageUrl = imgUploadRes.imageUrl || "";
         }
-          const response = await axiosInstance.post(API_PATHS.AUTH.REGISTER, {
+          await axiosInstance.post(API_PATHS.AUTH.REGISTER, {
             name: fullName,
             email,
             password,

@@ -3,6 +3,14 @@ const Group = require("../models/Group");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 
+// Global variable to hold the io instance
+let ioInstance = null;
+
+// Function to set io instance from server
+const setIo = (io) => {
+  ioInstance = io;
+};
+
 // Send a direct message to a user
 const sendDirectMessage = async (req, res) => {
   try {
@@ -30,9 +38,10 @@ const sendDirectMessage = async (req, res) => {
 
     await message.save();
     
-    // Create notification for recipient
+    // Create notification for recipient - using both fields to ensure compatibility
     await Notification.create({
-      recipient: recipientId,
+      recipient: recipientId,  // Keep the recipient field for direct message lookup
+      userId: recipientId,     // Also use userId field to match notification controller
       type: "message",
       message: `${req.user.name} sent you a message`,
       relatedUser: req.user._id,
@@ -42,6 +51,18 @@ const sendDirectMessage = async (req, res) => {
     // Populate sender and recipient info for response
     await message.populate("sender", "name email profileImageUrl");
     await message.populate("recipient", "name email profileImageUrl");
+    
+    // Emit real-time message to recipient via socket if available
+    if (ioInstance) {
+      ioInstance.to(recipientId.toString()).emit('newMessage', {
+        message: message.toObject(),
+        sender: req.user,
+        conversationUpdate: {
+          lastMessage: message.content,
+          lastMessageAt: message.createdAt,
+        }
+      });
+    }
 
     res.status(201).json({ message });
   } catch (error) {
@@ -77,9 +98,47 @@ const sendGroupMessage = async (req, res) => {
 
     await message.save();
     
+    // Create notifications for all group members except the sender - using both fields
+    const notificationPromises = group.members
+      .filter(member => member._id.toString() !== req.user._id.toString()) // Exclude sender
+      .map(async (member) => {
+        return Notification.create({
+          recipient: member._id,  // Keep recipient field for direct lookup
+          userId: member._id,     // Also use userId field to match notification controller
+          type: "message",
+          message: `${req.user.name} sent a message in ${group.name}`,
+          relatedUser: req.user._id,
+          relatedMessage: message._id,
+          relatedGroup: group._id,
+        });
+      });
+
+    await Promise.all(notificationPromises);
+    
     // Populate sender and group info for response
     await message.populate("sender", "name email profileImageUrl");
     await message.populate("group", "name avatar");
+    
+    // Emit real-time message to all group members via socket if available
+    if (ioInstance) {
+      // Get all group members except sender
+      const groupMembers = await Group.findById(groupId).select('members');
+      const memberIds = groupMembers.members.filter(memberId => 
+        memberId.toString() !== req.user._id.toString()
+      );
+      
+      // Emit to each member
+      memberIds.forEach(memberId => {
+        ioInstance.to(memberId.toString()).emit('newMessage', {
+          message: message.toObject(),
+          sender: req.user,
+          conversationUpdate: {
+            lastMessage: message.content,
+            lastMessageAt: message.createdAt,
+          }
+        });
+      });
+    }
 
     res.status(201).json({ message });
   } catch (error) {
@@ -164,7 +223,7 @@ const getGroupMessages = async (req, res) => {
       isDeleted: { $ne: true } 
     })
       .populate("sender", "name email profileImageUrl")
-      .populate("group", "name avatar")
+      .populate("group", "name avatar description createdBy admins members")
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -238,12 +297,76 @@ const getUserConversations = async (req, res) => {
   }
 };
 
+// Get user's group conversations
+const getUserGroupConversations = async (req, res) => {
+  try {
+    // Get all groups the user is a member of
+    const groups = await Group.find({
+      members: { $in: [req.user._id] }
+    })
+    .populate("members", "name email profileImageUrl")
+    .populate("admins", "name email profileImageUrl")
+    .populate("createdBy", "name email profileImageUrl");
+    
+    // For each group, get the latest message and unread count
+    const groupConversations = [];
+    
+    for (const group of groups) {
+      // Get the latest message in the group
+      const latestMessage = await Message.findOne({
+        group: group._id,
+        isDeleted: { $ne: true }
+      })
+      .populate("sender", "name email profileImageUrl")
+      .sort({ createdAt: -1 });
+      
+      if (latestMessage) {
+        // Calculate unread count for this group
+        const unreadCount = await Message.countDocuments({
+          group: group._id,
+          sender: { $ne: req.user._id }, // Messages not sent by current user
+          isDeleted: { $ne: true },
+          $or: [
+            { "readBy.user": { $ne: req.user._id } },
+            { "readBy.user": { $exists: false } }
+          ]
+        });
+        
+        groupConversations.push({
+          group: {
+            _id: group._id,
+            name: group.name,
+            avatar: group.avatar,
+            members: group.members,
+            admins: group.admins,
+            createdBy: group.createdBy
+          },
+          lastMessage: latestMessage.content,
+          lastMessageAt: latestMessage.createdAt,
+          lastMessageSender: latestMessage.sender.name,
+          unreadCount: unreadCount
+        });
+      }
+    }
+    
+    // Sort by latest message time
+    groupConversations.sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
+    
+    res.json({ conversations: groupConversations });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 // Get user's groups
 const getUserGroups = async (req, res) => {
   try {
     const groups = await Group.find({
       members: { $in: [req.user._id] }
-    }).populate("members", "name email profileImageUrl");
+    })
+    .populate("members", "name email profileImageUrl")
+    .populate("admins", "name email profileImageUrl")
+    .populate("createdBy", "name email profileImageUrl");
 
     res.json({ groups });
   } catch (error) {
@@ -273,6 +396,8 @@ const createGroup = async (req, res) => {
 
     await group.save();
     await group.populate("members", "name email profileImageUrl");
+    await group.populate("admins", "name email profileImageUrl");
+    await group.populate("createdBy", "name email profileImageUrl");
 
     res.status(201).json({ group });
   } catch (error) {
@@ -374,6 +499,7 @@ const deleteMessage = async (req, res) => {
     // Find the message
     const message = await Message.findById(messageId);
     if (!message) {
+      console.error(`Message with ID ${messageId} not found`);
       return res.status(404).json({ message: "Message not found" });
     }
 
@@ -390,13 +516,55 @@ const deleteMessage = async (req, res) => {
       return res.status(403).json({ message: "You don't have permission to delete this message" });
     }
 
+    // Get the original message before deletion to use in notification
+    const originalMessage = await Message.findById(messageId);
+    
     // Soft delete the message
     await Message.findByIdAndUpdate(messageId, {
       isDeleted: true,
       deletedBy: req.user._id,
       deletedAt: new Date()
     });
-
+    
+    // Create notification for message deletion
+    if (originalMessage.recipient && !originalMessage.group) {
+      // For direct messages, notify the recipient
+      const recipientId = originalMessage.sender.toString() === req.user._id.toString() 
+        ? originalMessage.recipient 
+        : originalMessage.sender;
+        
+      await Notification.create({
+        recipient: recipientId,  // Keep recipient field for direct lookup
+        userId: recipientId,     // Also use userId field to match notification controller
+        type: "message",
+        title: "Message Deleted",
+        message: `${req.user.name} deleted a message`,
+        relatedUser: req.user._id,
+        relatedMessage: originalMessage._id,
+      });
+    } else if (originalMessage.group) {
+      // For group messages, notify all other group members
+      const group = await Group.findById(originalMessage.group);
+      if (group) {
+        const otherMembers = group.members.filter(member => 
+          member.toString() !== req.user._id.toString()
+        );
+        
+        // Create notification for each other group member
+        for (const memberId of otherMembers) {
+          await Notification.create({
+            recipient: memberId,  // Keep recipient field for direct lookup
+            userId: memberId,     // Also use userId field to match notification controller
+            type: "message",
+            title: "Message Deleted",
+            message: `${req.user.name} deleted a message in ${group.name}`,
+            relatedUser: req.user._id,
+            relatedMessage: originalMessage._id,
+          });
+        }
+      }
+    }
+    
     res.json({ message: "Message deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -469,6 +637,7 @@ module.exports = {
   getDirectMessages,
   getGroupMessages,
   getUserConversations,
+  getUserGroupConversations,
   getUserGroups,
   createGroup,
   addMemberToGroup,
@@ -476,4 +645,6 @@ module.exports = {
   deleteMessage,
   markMessagesAsRead,
   updateMessageStatus,
+  setIo,
 };
+

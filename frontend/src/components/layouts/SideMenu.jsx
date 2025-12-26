@@ -5,6 +5,7 @@ import { UserContext } from "../../context/UserContext";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import uploadImage from "../../utils/uploadImage";
+import { socket } from "../../components/utils/socket";
 // import { useContext } from "react";
 export default function SideMenu({ activeMenu }) {
   const [sideMenuData, setSideMenuData] = useState([]);
@@ -41,6 +42,20 @@ export default function SideMenu({ activeMenu }) {
 
       // Update user context with new data
       updateUser(response.data);
+      
+      // Emit profile update event to notify other users
+      socket.emit('profileUpdate', {
+        userId: response.data._id,
+        profileImageUrl: response.data.profileImageUrl,
+        name: response.data.name
+      });
+      
+      // Update own profile in conversations
+      window.dispatchEvent(new CustomEvent('profileUpdated', { detail: {
+        userId: response.data._id,
+        profileImageUrl: response.data.profileImageUrl,
+        name: response.data.name
+      }}));
     } catch (err) {
       console.error("Error updating profile image:", err);
       alert("Failed to update profile image");

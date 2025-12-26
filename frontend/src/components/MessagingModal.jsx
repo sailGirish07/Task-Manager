@@ -420,15 +420,18 @@
 // export default MessagingModal;
 
 
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useRef } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import { API_PATHS } from '../utils/apiPaths';
 import { UserContext } from '../context/UserContext';
+import { socket } from './utils/socket';
+
 
 const MessagingModal = ({ isOpen, onClose }) => {
   const { user } = useContext(UserContext);
   const [activeTab, setActiveTab] = useState('personal');
   const [conversations, setConversations] = useState([]);
+
   const [groups, setGroups] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -443,6 +446,10 @@ const MessagingModal = ({ isOpen, onClose }) => {
   const [allUsers, setAllUsers] = useState([]); // For group creation
   const [onlineUsers, setOnlineUsers] = useState(new Set()); // Track online users
   const [showGroupManagement, setShowGroupManagement] = useState(false); // Group management modal
+  const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, messageId: null }); // Context menu for message deletion
+  const contextMenuRef = useRef(null);
+  const messagesEndRef = useRef(null); // For auto-scrolling to bottom
+  const messagesContainerRef = useRef(null); // For messages container
 
   // Fetch initial data
   useEffect(() => {
@@ -452,6 +459,11 @@ const MessagingModal = ({ isOpen, onClose }) => {
       fetchAllUsers(); // For group creation only
       checkOnlineStatus(); // Initial check
       
+      // Connect to socket and join user room
+      if (typeof socket !== 'undefined' && socket && user) {
+        socket.emit('join', user._id);
+      }
+      
       // Poll online status every 30 seconds
       const intervalId = setInterval(() => {
         checkOnlineStatus();
@@ -460,7 +472,87 @@ const MessagingModal = ({ isOpen, onClose }) => {
       // Cleanup interval on modal close
       return () => clearInterval(intervalId);
     }
-  }, [isOpen]);
+  }, [isOpen, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle clicks outside context menu to close it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
+        setContextMenu({ show: false, x: 0, y: 0, messageId: null });
+      }
+    };
+
+    if (contextMenu.show) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [contextMenu.show]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    const scrollToBottom = () => {
+      if (messagesContainerRef.current) {
+        // Use setTimeout to ensure DOM is updated before scrolling
+        setTimeout(() => {
+          // Scroll to the bottom
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }, 50); // Small delay to ensure DOM update
+      }
+    };
+
+    // Only scroll when new messages are added (not on initial load)
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages]); // Only run when messages change
+
+  // Handle real-time messages
+  useEffect(() => {
+    if (typeof socket !== 'undefined' && socket && isOpen) {
+      const handleNewMessage = (data) => {
+        // Update conversations list with new message
+        setConversations(prevConversations => {
+          const updatedConversations = [...prevConversations];
+          const conversationIndex = updatedConversations.findIndex(conv => 
+            conv.user._id === data.sender._id
+          );
+          
+          if (conversationIndex !== -1) {
+            // Update existing conversation
+            updatedConversations[conversationIndex] = {
+              ...updatedConversations[conversationIndex],
+              lastMessage: data.conversationUpdate.lastMessage,
+              lastMessageAt: data.conversationUpdate.lastMessageAt,
+              unreadCount: updatedConversations[conversationIndex].unreadCount + 1
+            };
+          } else {
+            // Add new conversation if not exists
+            updatedConversations.unshift({
+              user: data.sender,
+              lastMessage: data.conversationUpdate.lastMessage,
+              lastMessageAt: data.conversationUpdate.lastMessageAt,
+              unreadCount: 1
+            });
+          }
+          
+          return updatedConversations;
+        });
+
+        // If this message is for the currently selected chat, update messages
+        if (selectedChat && selectedChat.type === 'user' && selectedChat.id === data.sender._id) {
+          setMessages(prevMessages => [...prevMessages, data.message]);
+        }
+      };
+
+      socket.on('newMessage', handleNewMessage);
+
+      return () => {
+        if (typeof socket !== 'undefined' && socket) {
+          socket.off('newMessage', handleNewMessage);
+        }
+      };
+    }
+  }, [socket, selectedChat, isOpen]);
 
   // Fetch messages when a chat is selected
   useEffect(() => {
@@ -469,14 +561,20 @@ const MessagingModal = ({ isOpen, onClose }) => {
       markMessagesAsRead(); // Mark as read when opening chat
       updateMessageStatusToDelivered(); // Update to delivered if not already
     }
-  }, [selectedChat]);
+  }, [selectedChat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchConversations = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axiosInstance.get(API_PATHS.MESSAGES.GET_CONVERSATIONS);
-      setConversations(response.data.conversations || []);
+      
+      if (activeTab === 'personal') {
+        const response = await axiosInstance.get(API_PATHS.MESSAGES.GET_CONVERSATIONS);
+        setConversations(response.data.conversations || []);
+      } else {
+        const response = await axiosInstance.get(API_PATHS.MESSAGES.GET_GROUP_CONVERSATIONS);
+        setConversations(response.data.conversations || []);
+      }
     } catch (error) {
       console.error('Error fetching conversations:', error);
       setError('Failed to load conversations');
@@ -572,6 +670,9 @@ const MessagingModal = ({ isOpen, onClose }) => {
   };
 
   const deleteMessage = async (messageId) => {
+    // Close context menu first
+    setContextMenu({ show: false, x: 0, y: 0, messageId: null });
+    
     if (!window.confirm('Are you sure you want to delete this message?')) {
       return;
     }
@@ -580,9 +681,15 @@ const MessagingModal = ({ isOpen, onClose }) => {
       await axiosInstance.delete(API_PATHS.MESSAGES.DELETE_MESSAGE(messageId));
       // Refresh messages
       await fetchMessages();
+      // Clear any previous error
+      setError(null);
     } catch (error) {
       console.error('Error deleting message:', error);
-      setError('Failed to delete message');
+      if (error.response?.status === 404) {
+        setError('Message not found or already deleted');
+      } else {
+        setError('Failed to delete message: ' + (error.response?.data?.message || error.message));
+      }
     }
   };
 
@@ -689,6 +796,34 @@ const MessagingModal = ({ isOpen, onClose }) => {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
   };
+  
+  const handleContextMenu = (e, messageId, canDelete) => {
+    e.preventDefault(); // Prevent default context menu
+    
+    if (!canDelete) return; // Only show context menu if user can delete the message
+    
+    // Calculate position to ensure menu stays within viewport
+    const menuWidth = 120; // Approximate width of the context menu
+    const menuHeight = 40; // Approximate height of the context menu
+    
+    let posX = e.clientX;
+    let posY = e.clientY;
+    
+    // Adjust position if menu would go outside viewport
+    if (posX + menuWidth > window.innerWidth) {
+      posX = window.innerWidth - menuWidth - 10;
+    }
+    if (posY + menuHeight > window.innerHeight) {
+      posY = window.innerHeight - menuHeight - 10;
+    }
+    
+    setContextMenu({
+      show: true,
+      x: posX,
+      y: posY,
+      messageId: messageId
+    });
+  };
 
   const filteredConversations = conversations?.filter(conv =>
     conv.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -720,14 +855,6 @@ const MessagingModal = ({ isOpen, onClose }) => {
         {/* HEADER */}
         <div className="flex items-center justify-between px-6 py-5 border-b">
           <h2 className="text-xl font-semibold text-gray-900">Messages</h2>
-          <button 
-            onClick={onClose} 
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
 
         {/* Error Message */}
@@ -754,7 +881,13 @@ const MessagingModal = ({ isOpen, onClose }) => {
             {/* Tabs */}
             <div className="flex gap-0 px-5 py-5 border-b">
               <button
-                onClick={() => setActiveTab('personal')}
+                onClick={() => {
+                  setActiveTab('personal');
+                  // Clear selected chat when switching to personal tab
+                  if (activeTab !== 'personal') {
+                    setSelectedChat(null);
+                  }
+                }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === 'personal'
                     ? 'bg-blue-50 text-blue-600'
@@ -768,7 +901,13 @@ const MessagingModal = ({ isOpen, onClose }) => {
               </button>
 
               <button
-                onClick={() => setActiveTab('groups')}
+                onClick={() => {
+                  setActiveTab('groups');
+                  // Clear selected chat when switching to groups tab
+                  if (activeTab !== 'groups') {
+                    setSelectedChat(null);
+                  }
+                }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === 'groups'
                     ? 'bg-blue-50 text-blue-600'
@@ -1015,7 +1154,10 @@ const MessagingModal = ({ isOpen, onClose }) => {
                 </div>
 
                 {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-white">
+                <div 
+                  ref={messagesContainerRef}
+                  className="flex-1 overflow-y-auto p-6 space-y-3 bg-white"
+                >
                   {messages.length > 0 ? (
                     messages.map((msg) => {
                       const isCurrentUser = msg.sender?._id === user?._id;
@@ -1045,6 +1187,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                       ? 'bg-blue-500 text-white rounded-tr-sm'
                                       : 'bg-gray-100 text-gray-900 rounded-tl-sm'
                                   }`}
+                                  onContextMenu={(e) => handleContextMenu(e, msg._id, canDeleteMessage)}
                                 >
                                   <div className="flex items-end gap-1.5">
                                     <span>{msg.content}</span>
@@ -1097,15 +1240,6 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                   : `${msg.sender?.name} deleted this message`}
                               </div>
                             )}
-                            {/* Delete button for own messages or group admin */}
-                            {!msg.isDeleted && canDeleteMessage && (
-                              <button
-                                onClick={() => deleteMessage(msg._id)}
-                                className="text-xs mt-1 text-red-500 hover:text-red-700 cursor-pointer"
-                              >
-                                Delete
-                              </button>
-                            )}
                           </div>
                         </div>
                       );
@@ -1113,6 +1247,8 @@ const MessagingModal = ({ isOpen, onClose }) => {
                   ) : (
                     <p className="text-center text-gray-400 mt-8">No messages yet</p>
                   )}
+                  {/* Scroll anchor for auto-scroll */}
+                  <div ref={messagesEndRef} />
                 </div>
 
                 {/* Message Input */}
@@ -1151,14 +1287,24 @@ const MessagingModal = ({ isOpen, onClose }) => {
           >
             Cancel
           </button>
-          <button 
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium text-sm transition-colors"
-          >
-            Done
-          </button>
         </div>
       </div>
+
+      {/* Context Menu for Message Deletion */}
+      {contextMenu.show && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-[100002] bg-white shadow-lg rounded-md py-1 min-w-[120px] border border-gray-200"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => deleteMessage(contextMenu.messageId)}
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+          >
+            Delete Message
+          </button>
+        </div>
+      )}
 
       {/* Create Group Modal */}
       {showCreateGroup && (
@@ -1287,7 +1433,25 @@ const MessagingModal = ({ isOpen, onClose }) => {
               </button>
             </div>
 
-            <div className="px-6 py-4 space-y-4">
+            <div className="px-6 py-4 space-y-6">
+              {/* Group Details */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Group Details</h4>
+                <div className="border border-gray-300 rounded-lg p-4">
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-600">Name</p>
+                    <p className="font-medium">{groups.find(g => g._id === selectedChat.id)?.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Description</p>
+                    <p className="font-medium">
+                      {groups.find(g => g._id === selectedChat.id)?.description || 'No description provided'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Group Members */}
               <div>
                 <h4 className="font-medium text-gray-900 mb-2">Group Members</h4>
                 <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
@@ -1308,7 +1472,21 @@ const MessagingModal = ({ isOpen, onClose }) => {
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-900">{member.name}</p>
-                              <p className="text-xs text-gray-500">{groups.find(g => g._id === selectedChat.id)?.createdBy === member._id ? 'Creator' : 'Member'}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs text-gray-500">
+                                  {isGroupCreator ? 'Creator' : isAdmin ? 'Admin' : 'Member'}
+                                </p>
+                                {isGroupCreator && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    Creator
+                                  </span>
+                                )}
+                                {isAdmin && !isGroupCreator && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Admin
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           

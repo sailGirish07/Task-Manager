@@ -3,8 +3,16 @@ const Notification = require("../models/Notification");
 // Get all notifications for the logged-in user
 const getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ userId: req.user.id })
+    // Look for notifications using both userId and recipient fields to ensure compatibility
+    const notifications = await Notification.find({ 
+      $or: [
+        { userId: req.user._id },
+        { recipient: req.user._id }
+      ]
+    })
       .populate("relatedId", "title name")
+      .populate("relatedUser", "name email profileImageUrl") // Add related user info
+      .populate("relatedMessage", "content createdAt") // Add related message info
       .sort({ createdAt: -1 });
 
     res.json(notifications);
@@ -37,10 +45,25 @@ const markAsRead = async (req, res) => {
 // Mark all notifications as read
 const markAllAsRead = async (req, res) => {
   try {
-    await Notification.updateMany(
-      { userId: req.user.id, read: false },
-      { read: true }
-    );
+    // Find notifications for the user (using both userId and recipient fields)
+    const notifications = await Notification.find({
+      $or: [
+        { userId: req.user._id },
+        { recipient: req.user._id }
+      ],
+      read: false
+    });
+    
+    // Get the IDs of unread notifications
+    const notificationIds = notifications.map(notification => notification._id);
+    
+    // Update all these notifications to be read
+    if (notificationIds.length > 0) {
+      await Notification.updateMany(
+        { _id: { $in: notificationIds } },
+        { read: true }
+      );
+    }
 
     res.json({ message: "All notifications marked as read" });
   } catch (error) {
@@ -68,7 +91,12 @@ const deleteNotification = async (req, res) => {
 // Delete all notifications
 const deleteAllNotifications = async (req, res) => {
   try {
-    await Notification.deleteMany({ userId: req.user.id });
+    await Notification.deleteMany({ 
+      $or: [
+        { userId: req.user._id },
+        { recipient: req.user._id }
+      ]
+    });
 
     res.json({ message: "All notifications deleted successfully" });
   } catch (error) {

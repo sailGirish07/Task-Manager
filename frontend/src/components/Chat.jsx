@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { LuSend, LuUsers, LuMessageSquare, LuPlus, LuX, LuPaperclip } from 'react-icons/lu';
 import axiosInstance from '../utils/axiosInstance';
 import { API_PATHS } from '../utils/apiPaths';
+import { socket } from '../components/utils/socket';
 
 const Chat = () => {
   const [activeTab, setActiveTab] = useState('direct'); // 'direct' or 'groups'
@@ -16,31 +17,6 @@ const Chat = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-
-  // Fetch conversations and groups
-  useEffect(() => {
-    if (activeTab === 'direct') {
-      fetchConversations();
-    } else {
-      fetchGroups();
-    }
-  }, [activeTab]);
-
-  // Fetch messages when a chat is selected
-  useEffect(() => {
-    if (selectedChat) {
-      fetchMessages();
-    }
-  }, [selectedChat]);
-
-  // Scroll to bottom of messages
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
 
   const fetchConversations = async () => {
     try {
@@ -77,6 +53,76 @@ const Chat = () => {
       console.error('Error fetching messages:', error);
     }
   };
+
+  // Fetch conversations and groups
+  useEffect(() => {
+    if (activeTab === 'direct') {
+      fetchConversations();
+    } else {
+      fetchGroups();
+    }
+  }, [activeTab]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Fetch messages when a chat is selected
+  useEffect(() => {
+    if (selectedChat) {
+      fetchMessages();
+    }
+  }, [selectedChat, fetchMessages]);
+
+  // Scroll to bottom of messages
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Handle profile updates
+  useEffect(() => {
+    const handleProfileUpdate = (data) => {
+      // Update conversations with new profile image
+      setConversations(prevConversations => 
+        prevConversations.map(conv => 
+          conv.user._id === data.userId 
+            ? { ...conv, user: { ...conv.user, profileImageUrl: data.profileImageUrl, name: data.name } }
+            : conv
+        )
+      );
+      
+      // Update messages if the sender is the updated user
+      setMessages(prevMessages => 
+        prevMessages.map(message => 
+          message.sender._id === data.userId
+            ? { ...message, sender: { ...message.sender, profileImageUrl: data.profileImageUrl, name: data.name } }
+            : message
+        )
+      );
+    };
+    
+    const handleWindowProfileUpdate = (e) => {
+      handleProfileUpdate(e.detail);
+    };
+    
+    // Also refresh conversations to ensure latest data
+    const handleProfileUpdateAndRefresh = (data) => {
+      handleProfileUpdate(data);
+      if (activeTab === 'direct') {
+        fetchConversations();
+      } else {
+        fetchGroups();
+      }
+    };
+    
+    socket.on('profileUpdated', handleProfileUpdateAndRefresh);
+    window.addEventListener('profileUpdated', handleWindowProfileUpdate);
+    
+    return () => {
+      socket.off('profileUpdated', handleProfileUpdateAndRefresh);
+      window.removeEventListener('profileUpdated', handleWindowProfileUpdate);
+    };
+  }, [activeTab, fetchConversations, fetchGroups]);
 
   const fetchAllUsers = async () => {
     try {
@@ -220,11 +266,19 @@ const Chat = () => {
                 onClick={() => setSelectedChat({ type: 'direct', id: conv.user._id })}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                    <span className="text-sm font-medium text-white">
-                      {conv.user.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
+                  {conv.user.profileImageUrl ? (
+                    <img
+                      src={conv.user.profileImageUrl}
+                      alt={conv.user.name}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
+                      <span className="text-sm font-medium text-white">
+                        {conv.user.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center">
                       <h4 className="font-medium text-gray-900 truncate">{conv.user.name}</h4>
@@ -276,11 +330,19 @@ const Chat = () => {
               <div className="flex items-center gap-3">
                 {selectedChat.type === 'direct' ? (
                   <>
-                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                      <span className="text-sm font-medium text-white">
-                        {conversations.find(c => c.user._id === selectedChat.id)?.user.name.charAt(0).toUpperCase() || 'U'}
-                      </span>
-                    </div>
+                    {conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl ? (
+                      <img
+                        src={conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl}
+                        alt={conversations.find(c => c.user._id === selectedChat.id)?.user.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
+                        <span className="text-sm font-medium text-white">
+                          {conversations.find(c => c.user._id === selectedChat.id)?.user.name.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                    )}
                     <div>
                       <h4 className="font-medium text-gray-900">
                         {conversations.find(c => c.user._id === selectedChat.id)?.user.name || 'User'}
@@ -313,6 +375,23 @@ const Chat = () => {
                   key={message._id}
                   className={`flex ${message.sender._id === localStorage.getItem('userId') ? 'justify-end' : 'justify-start'}`}
                 >
+                  {message.sender._id !== localStorage.getItem('userId') && (
+                    <div className="mr-2 flex-shrink-0">
+                      {message.sender.profileImageUrl ? (
+                        <img
+                          src={message.sender.profileImageUrl}
+                          alt={message.sender.name}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+                          <span className="text-xs font-medium text-white">
+                            {message.sender.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                       message.sender._id === localStorage.getItem('userId')
@@ -320,6 +399,11 @@ const Chat = () => {
                         : 'bg-gray-100 text-gray-800'
                     }`}
                   >
+                    {message.sender._id !== localStorage.getItem('userId') && selectedChat?.type === 'group' && (
+                      <p className="text-xs font-medium text-gray-600 mb-1">
+                        {message.sender.name}
+                      </p>
+                    )}
                     <p className="text-sm">{message.content}</p>
                     <p className={`text-xs mt-1 ${message.sender._id === localStorage.getItem('userId') ? 'text-blue-100' : 'text-gray-500'}`}>
                       {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -45,7 +45,11 @@ export default function ManageUsers() {
   };
 
   useEffect(() => {
-    getAllUsers();
+    const fetchUsers = async () => {
+      await getAllUsers();
+    };
+    
+    fetchUsers();
 
     return () => {};
   }, [])
