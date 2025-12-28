@@ -33,8 +33,8 @@ const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Generate verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate verification code using crypto for better security
+    const verificationCode = crypto.randomInt(100000, 999999).toString();
     const codeExpires = new Date(Date.now() + 30 * 1000); // 30 seconds
 
     //create new user (unverified)
@@ -88,7 +88,7 @@ const loginUser = async (req, res) => {
     }
     
     // User not verified - send verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCode = crypto.randomInt(100000, 999999).toString();
     const codeExpires = new Date(Date.now() + 30 * 1000); // 30 seconds
     
     // Save code to user
@@ -270,7 +270,7 @@ const resendVerificationEmail = async (req, res) => {
     }
     
     // Generate new verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCode = crypto.randomInt(100000, 999999).toString();
     const codeExpires = new Date(Date.now() + 30 * 1000); // 30 seconds
     
     // Reset verification status and update code
@@ -320,7 +320,7 @@ const forgotPassword = async (req, res) => {
     }
     
     // Generate 6-digit verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCode = crypto.randomInt(100000, 999999).toString();
     
     // Create JWT token with email and code (60 seconds expiry)
     const payload = {

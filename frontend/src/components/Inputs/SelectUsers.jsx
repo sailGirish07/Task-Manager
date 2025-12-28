@@ -5,15 +5,13 @@ import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import AvatarGroup from "../AvatarGroup";
 
+export default function SelectUsers({ selectedUsers, setSelectedUsers }) {
+  const [allUsers, setAllUser] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [tempSelectedUsers, setTempSelectedUsers] = useState([]);
 
-export default function SelectUsers({selectedUsers, setSelectedUsers}) {
-
-    const [allUsers, setAllUser] = useState([])
-    const [isModalOpen, setIsModalOpen] = useState(false)
-    const [tempSelectedUsers, setTempSelectedUsers] = useState([])
-
-    const getAllUsers = async () => {
-        try {
+  const getAllUsers = async () => {
+    try {
       const response = await axiosInstance.get(API_PATHS.USERS.GET_ALL_USERS);
       if (response.data?.length > 0) {
         setAllUser(response.data);
@@ -40,91 +38,91 @@ export default function SelectUsers({selectedUsers, setSelectedUsers}) {
     .filter((user) => selectedUsers.includes(user._id))
     .map((user) => user.profileImageUrl);
 
-    useEffect(() => {
-      const fetchUsers = async () => {
-        await getAllUsers();
-      };
-      
-      fetchUsers();
-    }, []);
+  useEffect(() => {
+    const fetchUsers = async () => {
+      await getAllUsers();
+    };
 
-    useEffect(() => {
-      setTempSelectedUsers(selectedUsers);
+    fetchUsers();
+  }, []);
 
-      return () => {};
-    }, [selectedUsers]);
+  useEffect(() => {
+    setTempSelectedUsers(selectedUsers);
 
+    return () => {};
+  }, [selectedUsers]);
 
   return (
-  <div className="space-y-4 mt-2">
-    {selectedUserAvatars.length === 0 ? (
+    <div className="space-y-4 mt-2">
+      {selectedUserAvatars.length === 0 ? (
         <button className="card-btn" onClick={() => setIsModalOpen(true)}>
-            <LuUsers className="text-sm"/>Add Members
+          <LuUsers className="text-sm" />
+          Add Members
         </button>
-    ) : (
+      ) : (
         <button className="card-btn" onClick={() => setIsModalOpen(true)}>
-            <LuUsers className="text-sm"/>Edit Members ({selectedUserAvatars.length})
+          <LuUsers className="text-sm" />
+          Edit Members ({selectedUserAvatars.length})
         </button>
-    )}
+      )}
 
-    {selectedUserAvatars.length > 0 && (
+      {selectedUserAvatars.length > 0 && (
         <div className="cursor-pointer" onClick={() => setIsModalOpen(true)}>
-            <AvatarGroup avatars={selectedUserAvatars} maxVisible={3}/>
+          <AvatarGroup avatars={selectedUserAvatars} maxVisible={3} />
         </div>
-    )}
+      )}
 
-    <Modal
-    isOpen={isModalOpen}
-    onClose={() => setIsModalOpen(false)}
-    title="Select Users"
-    >
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Select Users"
+      >
         <div className="space-y-4 h-[60vh] overflow-y-auto">
-            {allUsers.map((user) => (
-                <div
-                key={user._id}
-                className="flex items-center gap-4 p-3 border-b border-gray-200"
-                >
-                    {user.profileImageUrl ? (
-                    <img
-                    src={user.profileImageUrl}
-                    alt={user.name}
-                    className="w-10 h-10 rounded-full"
-                    />
-                    ) : (
-                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                        <span className="text-gray-500 text-xs">{user.name.charAt(0)}</span>
-                    </div>
-                    )}
-
-                    <div
-                    className="flex-1">
-                    <p className="font-medium text-gray-800 dark:text-white">
-                        {user.name}
-                    </p>
-                    <p className="text-[13px] text-gray-500">{user.email}</p>
-                    </div>
-
-                    <input
-                    type="checkbox"
-                    checked={tempSelectedUsers.includes(user._id)}
-                    onChange={() => toggleUserSelection(user._id)}
-                    className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded-sm outline-none"
-                    />
+          {allUsers.map((user) => (
+            <div
+              key={user._id}
+              className="flex items-center gap-4 p-3 border-b border-gray-200"
+            >
+              {user.profileImageUrl ? (
+                <img
+                  src={user.profileImageUrl}
+                  alt={user.name}
+                  className="w-10 h-10 rounded-full"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                  <span className="text-gray-500 text-xs">
+                    {user.name.charAt(0)}
+                  </span>
                 </div>
-            ))}
+              )}
+
+              <div className="flex-1">
+                <p className="font-medium text-gray-800 dark:text-white">
+                  {user.name}
+                </p>
+                <p className="text-[13px] text-gray-500">{user.email}</p>
+              </div>
+
+              <input
+                type="checkbox"
+                checked={tempSelectedUsers.includes(user._id)}
+                onChange={() => toggleUserSelection(user._id)}
+                className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded-sm outline-none"
+              />
+            </div>
+          ))}
         </div>
 
         <div className="flex justify-end ga-4 pt-4">
-            <button className="card-btn" onClick={() => setIsModalOpen(false)}>
-                Cancel
-            </button>
-            <button className="card-btn-fill" onClick={handleAssign}>
-                Done
-            </button>
+          <button className="card-btn" onClick={() => setIsModalOpen(false)}>
+            Cancel
+          </button>
+          <button className="card-btn-fill" onClick={handleAssign}>
+            Done
+          </button>
         </div>
-  
-  </Modal>
-  </div>
+      </Modal>
+    </div>
   );
-};
-
+}

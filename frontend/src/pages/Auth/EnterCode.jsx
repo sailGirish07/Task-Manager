@@ -29,7 +29,7 @@ export default function EnterCode() {
     if (countdown <= 0) return;
 
     const timer = setInterval(() => {
-      setCountdown(prev => prev - 1);
+      setCountdown((prev) => prev - 1);
     }, 1000);
 
     return () => clearInterval(timer);
@@ -93,9 +93,9 @@ export default function EnterCode() {
   // Submit verification code
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const verificationCode = code.join("");
-    
+
     if (!verificationCode || verificationCode.length !== 6) {
       setError("Please enter a 6-digit code");
       setTimeout(() => setError(""), 3000);
@@ -107,18 +107,21 @@ export default function EnterCode() {
 
     try {
       // Verify the code with backend
-      const response = await axiosInstance.post(API_PATHS.AUTH.VERIFY_PASSWORD_RESET_CODE, {
-        email,
-        code: verificationCode
-      });
+      const response = await axiosInstance.post(
+        API_PATHS.AUTH.VERIFY_PASSWORD_RESET_CODE,
+        {
+          email,
+          code: verificationCode,
+        }
+      );
 
       if (response.data.success) {
         // Navigate to reset password page with reset token
-        navigate("/re-enter-password", { 
-          state: { 
+        navigate("/re-enter-password", {
+          state: {
             resetToken: response.data.resetToken,
-            email: email
-          } 
+            email: email,
+          },
         });
       }
     } catch (err) {
@@ -146,7 +149,8 @@ export default function EnterCode() {
       <div className="lg:w-[70%] h-3/4 md:h-full flex flex-col justify-center">
         <h3 className="text-xl font-semibold text-black">Verify Your Email</h3>
         <p className="text-xs text-slate-700 mt-[5px] mb-6">
-          Enter the 6-digit code sent to <span className="font-medium">{email}</span>
+          Enter the 6-digit code sent to{" "}
+          <span className="font-medium">{email}</span>
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -174,9 +178,13 @@ export default function EnterCode() {
               type="button"
               onClick={handleResendCode}
               disabled={isLoading || countdown > 0}
-              className={`text-sm ${countdown > 0 ? "text-gray-400" : "text-primary underline"}`}
+              className={`text-sm ${
+                countdown > 0 ? "text-gray-400" : "text-primary underline"
+              }`}
             >
-              {countdown > 0 ? `Resend code in ${formatTime(countdown)}` : "Resend Code"}
+              {countdown > 0
+                ? `Resend code in ${formatTime(countdown)}`
+                : "Resend Code"}
             </button>
           </div>
 

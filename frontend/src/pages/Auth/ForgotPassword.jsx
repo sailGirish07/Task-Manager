@@ -43,7 +43,10 @@ export default function EnterPass() {
     setMessage("");
 
     try {
-      const response = await axiosInstance.post(API_PATHS.AUTH.FORGOT_PASSWORD, { email });
+      const response = await axiosInstance.post(
+        API_PATHS.AUTH.FORGOT_PASSWORD,
+        { email }
+      );
       setMessage(response.data.message);
       // Navigate to enter code page
       setTimeout(() => {
@@ -70,7 +73,8 @@ export default function EnterPass() {
       <div className="lg:w-[70%] h-3/4 md:h-full flex flex-col justify-center">
         <h3 className="text-xl font-semibold text-black">Forgot Password</h3>
         <p className="text-xs text-slate-700 mt-[5px] mb-6">
-          Enter your email address and we'll send you a code to reset your password.
+          Enter your email address and we'll send you a code to reset your
+          password.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -84,13 +88,11 @@ export default function EnterPass() {
           />
 
           {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}
-          {message && <p className="text-green-500 text-xs pb-2.5">{message}</p>}
+          {message && (
+            <p className="text-green-500 text-xs pb-2.5">{message}</p>
+          )}
 
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={isLoading}
-          >
+          <button type="submit" className="btn-primary" disabled={isLoading}>
             {isLoading ? "Sending..." : "Send Code"}
           </button>
 

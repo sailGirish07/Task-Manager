@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { LuBell, LuCheck, LuX, LuLoader } from 'react-icons/lu';
+import React, { useState, useEffect, useRef } from "react";
+import { LuBell, LuCheck, LuX, LuLoader } from "react-icons/lu";
 
-
-import axiosInstance from '../utils/axiosInstance';
-import { API_PATHS } from '../utils/apiPaths';
+import axiosInstance from "../utils/axiosInstance";
+import { API_PATHS } from "../utils/apiPaths";
 
 const Notifications = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,12 +17,14 @@ const Notifications = () => {
       setLoading(true);
       const response = await axiosInstance.get(API_PATHS.NOTIFICATIONS.GET_ALL);
       setNotifications(response.data);
-      
+
       // Calculate unread count
-      const unread = response.data.filter(notification => !notification.read).length;
+      const unread = response.data.filter(
+        (notification) => !notification.read
+      ).length;
       setUnreadCount(unread);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error("Error fetching notifications:", error);
     } finally {
       setLoading(false);
     }
@@ -32,7 +33,7 @@ const Notifications = () => {
   // Fetch notifications on component mount and periodically
   useEffect(() => {
     fetchNotifications();
-    
+
     // Set up periodic refresh (every 30 seconds)
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
@@ -43,32 +44,34 @@ const Notifications = () => {
     try {
       await axiosInstance.put(API_PATHS.NOTIFICATIONS.MARK_AS_READ(id));
       // Update local state
-      setNotifications(prev => 
-        prev.map(notification => 
-          notification._id === id ? { ...notification, read: true } : notification
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification._id === id
+            ? { ...notification, read: true }
+            : notification
         )
       );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error("Error marking notification as read:", error);
     }
   };
-
-
 
   // Delete notification
   const deleteNotification = async (id) => {
     try {
       await axiosInstance.delete(API_PATHS.NOTIFICATIONS.DELETE(id));
       // Update local state
-      setNotifications(prev => 
-        prev.filter(notification => notification._id !== id)
+      setNotifications((prev) =>
+        prev.filter((notification) => notification._id !== id)
       );
-      setUnreadCount(prev => 
-        notifications.find(n => n._id === id && !n.read) ? Math.max(0, prev - 1) : prev
+      setUnreadCount((prev) =>
+        notifications.find((n) => n._id === id && !n.read)
+          ? Math.max(0, prev - 1)
+          : prev
       );
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      console.error("Error deleting notification:", error);
     }
   };
 
@@ -92,11 +95,19 @@ const Notifications = () => {
 
       {/* Notification modal */}
       {isOpen && (
-        <div className="fixed top-0 left-0 w-screen h-screen z-[99999] flex items-center justify-center bg-black/50" style={{ margin: 0, padding: '1rem' }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ height: '85vh', maxHeight: '90vh' }}>
+        <div
+          className="fixed top-0 left-0 w-screen h-screen z-[99999] flex items-center justify-center bg-black/50"
+          style={{ margin: 0, padding: "1rem" }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col"
+            style={{ height: "85vh", maxHeight: "90vh" }}
+          >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b">
-              <h2 className="text-xl font-semibold text-gray-900">Notifications</h2>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Notifications
+              </h2>
             </div>
 
             {/* Loading state */}
@@ -119,7 +130,7 @@ const Notifications = () => {
                     <div
                       key={notification._id}
                       className={`px-6 py-4 border-b hover:bg-gray-50 transition-colors ${
-                        !notification.read ? 'bg-blue-50' : ''
+                        !notification.read ? "bg-blue-50" : ""
                       }`}
                     >
                       <div className="flex justify-between items-start">

@@ -9,18 +9,12 @@ const taskSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     description: { type: String },
-    // priority: {
-    //   type: String,
-    //   enum: ["Low", "Medium", "High"],
-      
-    // },
-    // default: "Medium",
      priority: {
       type: String,
       enum: ["Low", "Medium", "High"],
       default: "Medium",
 
-      // 🔥 prevents "" from breaking enum
+      // prevents "" from breaking enum
       set: (value) => (value === "" ? undefined : value),
     },
     status: {

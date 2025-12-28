@@ -14,7 +14,6 @@ import AddAttachmentsInput from "../../components/Inputs/AddAttachmentsInput";
 import DeleteAlert from "../../components/DeleteAlert";
 import Modal from "../../components/Modal";
 
-
 export default function CreateTask() {
   const location = useLocation();
   const { taskId } = location.state || {};
@@ -55,17 +54,17 @@ export default function CreateTask() {
 
   //Create Task
   const CreateTask = async () => {
-   setLoading(true);
-      try{
-        // Validate date before sending to backend
-        const dueDateObj = new Date(taskData.dueDate);
-        if (isNaN(dueDateObj.getTime())) {
-          throw new Error("Invalid date format");
-        }
-        
-        const todolist = taskData.todoChecklist?.map((item) => ({
-        text : item,
-        completed : false,
+    setLoading(true);
+    try {
+      // Validate date before sending to backend
+      const dueDateObj = new Date(taskData.dueDate);
+      if (isNaN(dueDateObj.getTime())) {
+        throw new Error("Invalid date format");
+      }
+
+      const todolist = taskData.todoChecklist?.map((item) => ({
+        text: item,
+        completed: false,
       }));
 
       await axiosInstance.post(API_PATHS.TASKS.CREATE_TASK, {
@@ -77,29 +76,31 @@ export default function CreateTask() {
       toast.success("Task created successfully");
 
       clearData();
-      }catch(err){
-        console.log("Error creating task:", err);
-        setError("Failed to create task: " + (err.message || "Unknown error"));
-        setLoading(false);
-      }finally{
-        setLoading(false)
-      }
+    } catch (err) {
+      console.log("Error creating task:", err);
+      setError("Failed to create task: " + (err.message || "Unknown error"));
+      setLoading(false);
+    } finally {
+      setLoading(false);
     }
-  
+  };
+
   //Update Task
   const UpdateTask = async () => {
-    setLoading(true)
+    setLoading(true);
 
-    try{
+    try {
       // Validate date before sending to backend
       const dueDateObj = new Date(taskData.dueDate);
       if (isNaN(dueDateObj.getTime())) {
         throw new Error("Invalid date format");
       }
-      
+
       const todoList = taskData.todoChecklist?.map((item) => {
         const prevTodoChecklist = currentTask?.todoChecklist || [];
-        const matchedTask = prevTodoChecklist.find((task) => task.text === item);
+        const matchedTask = prevTodoChecklist.find(
+          (task) => task.text === item
+        );
 
         return {
           text: item,
@@ -107,14 +108,11 @@ export default function CreateTask() {
         };
       });
 
-      await axiosInstance.put(
-        API_PATHS.TASKS.UPDATE_TASK(taskId),
-        {
-          ...taskData,
-          dueDate: dueDateObj.toISOString(),
-          todoChecklist: todoList,
-        }
-      );
+      await axiosInstance.put(API_PATHS.TASKS.UPDATE_TASK(taskId), {
+        ...taskData,
+        dueDate: dueDateObj.toISOString(),
+        todoChecklist: todoList,
+      });
 
       toast.success("Task updated successfully");
       // Clear the form after successful update
@@ -123,14 +121,14 @@ export default function CreateTask() {
       setCurrentTask(null);
       // Navigate back to tasks list
       setTimeout(() => {
-        navigate('/admin/tasks');
+        navigate("/admin/tasks");
       }, 1000);
-    }catch(err){
-      console.error("Error updating task:", err)
+    } catch (err) {
+      console.error("Error updating task:", err);
       setError("Failed to update task: " + (err.message || "Unknown error"));
-      setLoading(false)
-    }finally{
-      setLoading(false)
+      setLoading(false);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -175,8 +173,8 @@ export default function CreateTask() {
       const response = await axiosInstance.get(
         API_PATHS.TASKS.GET_TASK_BY_ID(taskId)
       );
-      
-      if(response.data?.task){
+
+      if (response.data?.task) {
         const taskInfo = response.data.task;
         setCurrentTask(taskInfo);
 
@@ -185,37 +183,43 @@ export default function CreateTask() {
           description: taskInfo.description || "",
           priority: taskInfo.priority || "",
           dueDate: taskInfo.dueDate
-           ? moment(taskInfo.dueDate).format("YYYY-MM-DD")
-           : "",
+            ? moment(taskInfo.dueDate).format("YYYY-MM-DD")
+            : "",
           assignedTo: taskInfo.assignedTo?.map((item) => item?._id) || [],
-          todoChecklist: taskInfo.todoChecklist?.map((item) => item?.text) || [],
+          todoChecklist:
+            taskInfo.todoChecklist?.map((item) => item?.text) || [],
           attachments: taskInfo.attachments || [],
         });
       }
-    }catch(err){
-      console.error("Error fetching task:", err)
+    } catch (err) {
+      console.error("Error fetching task:", err);
     }
   };
 
   //Delete Task
   const deleteTask = async () => {
-    try{
+    try {
       await axiosInstance.delete(API_PATHS.TASKS.DELETE_TASK(taskId));
 
       setOpenDeleteAlert(false);
       toast.success("Task deleted successfully");
-      navigate('/admin/tasks')
-    }catch(err){
-      console.error("Error deleting task:", err.response?.data?.message || err.message);
-      toast.error("Failed to delete task: " + (err.response?.data?.message || err.message));
+      navigate("/admin/tasks");
+    } catch (err) {
+      console.error(
+        "Error deleting task:",
+        err.response?.data?.message || err.message
+      );
+      toast.error(
+        "Failed to delete task: " + (err.response?.data?.message || err.message)
+      );
     }
   };
 
   useEffect(() => {
-    if(taskId){
-      getTaskDetailsByID(taskId)
+    if (taskId) {
+      getTaskDetailsByID(taskId);
     }
-  }, [taskId])
+  }, [taskId]);
 
   return (
     <DashboardLayout activeMenu="Create Task">
@@ -353,13 +357,13 @@ export default function CreateTask() {
       </div>
 
       <Modal
-      isOpen={openDeleteAlert}
-      onClose={() => setOpenDeleteAlert(false)}
-      title="Delete Task"
+        isOpen={openDeleteAlert}
+        onClose={() => setOpenDeleteAlert(false)}
+        title="Delete Task"
       >
         <DeleteAlert
-        content = "Are you sure you want to delete this task?"
-        onDelete={() => deleteTask()}
+          content="Are you sure you want to delete this task?"
+          onDelete={() => deleteTask()}
         />
       </Modal>
     </DashboardLayout>

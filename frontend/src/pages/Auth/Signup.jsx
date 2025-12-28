@@ -7,7 +7,7 @@ import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 
 import uploadImage from "../../utils/uploadImage";
-import UserContext from "../../context/UserContext";
+import { UserContext } from "../../context/UserContext";
 import { validateEmail } from "../../utils/helper";
 
 export default function Signup() {

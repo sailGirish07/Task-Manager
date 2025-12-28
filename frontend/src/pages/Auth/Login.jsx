@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { validateEmail } from "../../utils/helper";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
-import UserContext from "../../context/UserContext";
+import { UserContext } from "../../context/UserContext";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -30,13 +30,15 @@ export default function Login() {
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000);
     }
-    
+
     // Check if redirected from email verification (comes from backend redirect)
     const urlParams = new URLSearchParams(location.search);
-    if (urlParams.get('verified') === 'true') {
-      setSuccessMessage("Email verified successfully! Please login within 15 minutes.");
+    if (urlParams.get("verified") === "true") {
+      setSuccessMessage(
+        "Email verified successfully! Please login within 15 minutes."
+      );
       // Remove query parameter from URL
-      window.history.replaceState({}, document.title, '/login');
+      window.history.replaceState({}, document.title, "/login");
       // Clear success message after 5 seconds (important message)
       setTimeout(() => setSuccessMessage(""), 5000);
     }
@@ -48,8 +50,6 @@ export default function Login() {
       emailRef.current.focus();
     }
   }, []);
-
-
 
   //Handle login form submit
   const handleLogin = async (e) => {
@@ -69,14 +69,14 @@ export default function Login() {
 
     setError("");
     setShowResendLink(false); // Clear resend link on new login attempt
-    
+
     // Show immediate loading feedback
     setSuccessMessage("Processing login...");
 
     try {
       const response = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
         email,
-        password
+        password,
       });
 
       const { token, role } = response.data;
@@ -93,14 +93,16 @@ export default function Login() {
         }
       } else if (response.data.verificationRequired) {
         // Show success message and redirect to verification page
-        setSuccessMessage("Verification code sent to your email. Please check your inbox.");
+        setSuccessMessage(
+          "Verification code sent to your email. Please check your inbox."
+        );
         // Redirect to verification page after a short delay
         setTimeout(() => {
           setSuccessMessage("");
-          navigate("/login-verify", { 
-            state: { 
-              email: response.data.email 
-            } 
+          navigate("/login-verify", {
+            state: {
+              email: response.data.email,
+            },
           });
         }, 2000); // 2 seconds to show message
       }
@@ -118,7 +120,7 @@ export default function Login() {
       } else {
         setError("Something went wrong. Please try again");
       }
-      
+
       // Clear error message after 2 seconds
       setTimeout(() => setError(""), 2000);
     }
@@ -149,10 +151,10 @@ export default function Login() {
             placeholder="Min 8 characters"
             type="password"
           />
-          
+
           <div className="text-right mb-4">
-            <Link 
-              to="/forgot-password" 
+            <Link
+              to="/forgot-password"
               className="text-primary text-sm underline"
             >
               Forgot Password?
@@ -165,8 +167,8 @@ export default function Login() {
           {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}
           {showResendLink && (
             <p className="text-xs pb-2.5">
-              <Link 
-                to="/resend-verification" 
+              <Link
+                to="/resend-verification"
                 state={{ email: email }}
                 className="text-primary underline"
               >

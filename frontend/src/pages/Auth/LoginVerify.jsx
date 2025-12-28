@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import AuthLayout from "../../components/layouts/AuthLayout";
-import UserContext from "../../context/UserContext";
+import { UserContext } from "../../context/UserContext";
 
 export default function LoginVerify() {
   const [code, setCode] = useState(["", "", "", "", "", ""]);

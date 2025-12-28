@@ -1,18 +1,17 @@
-import React, {useState} from "react";
-import {HiOutlineX, HiOutlineMenu} from "react-icons/hi";
-import {LuMessageSquare} from "react-icons/lu";
+import React, { useState } from "react";
+import { HiOutlineX, HiOutlineMenu } from "react-icons/hi";
+import { LuMessageSquare } from "react-icons/lu";
 import Notifications from "../Notifications";
 import MessagingModal from "../MessagingModal";
 import SideMenu from "./SideMenu";
 
 export default function Navbar({ activeMenu }) {
-
-    const [openSideMenu, setOpenSideMenu] = useState(false);
-    const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [openSideMenu, setOpenSideMenu] = useState(false);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   return (
     <div className="flex gap-5 bg-white border border-b border-gray-200/50 backdrop-blur-[2px] py-4 px-7 sticky top-0 z-30">
       <button
-        className="clock lg:hidden text-black"  
+        className="clock lg:hidden text-black"
         onClick={() => {
           setOpenSideMenu(!openSideMenu);
         }}
@@ -39,8 +38,10 @@ export default function Navbar({ activeMenu }) {
           <SideMenu activeMenu={activeMenu} />
         </div>
       )}
-      <MessagingModal isOpen={isMessageModalOpen} onClose={() => setIsMessageModalOpen(false)} />
+      <MessagingModal
+        isOpen={isMessageModalOpen}
+        onClose={() => setIsMessageModalOpen(false)}
+      />
     </div>
   );
-};
-
+}

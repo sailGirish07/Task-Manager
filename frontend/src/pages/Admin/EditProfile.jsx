@@ -4,7 +4,7 @@ import ProfilePhotoSelector from "../../components/Inputs/ProfilePhotoSelector";
 import Input from "../../components/Inputs/Input";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
-import UserContext from "../../context/UserContext";
+import { UserContext } from "../../context/UserContext";
 import uploadImage from "../../utils/uploadImage";
 import { validateEmail } from "../../utils/helper";
 import toast from "react-hot-toast";
@@ -31,20 +31,20 @@ export default function EditProfile() {
   // Function to clear error and specific form fields
   const clearErrorAndField = (fieldToClear) => {
     setError("");
-    
+
     // Only clear the specific field that had the error
-    switch(fieldToClear) {
-      case 'fullName':
+    switch (fieldToClear) {
+      case "fullName":
         setFullName("");
         break;
-      case 'email':
+      case "email":
         setEmail("");
         break;
 
-      case 'newPassword':
+      case "newPassword":
         setNewPassword("");
         break;
-      case 'confirmPassword':
+      case "confirmPassword":
         setConfirmPassword("");
         break;
       default:
@@ -66,14 +66,14 @@ export default function EditProfile() {
       // Client-side validation
       if (!fullName) {
         setError("Please enter full name");
-        setTimeout(() => clearErrorAndField('fullName'), 2000);
+        setTimeout(() => clearErrorAndField("fullName"), 2000);
         setLoading(false);
         return;
       }
 
       if (!validateEmail(email)) {
         setError("Please enter a valid email address");
-        setTimeout(() => clearErrorAndField('email'), 2000);
+        setTimeout(() => clearErrorAndField("email"), 2000);
         setLoading(false);
         return;
       }
@@ -103,7 +103,7 @@ export default function EditProfile() {
       const updateData = {
         name: fullName,
         email,
-        profileImageUrl
+        profileImageUrl,
       };
 
       // Only include password if user wants to change it
@@ -112,27 +112,29 @@ export default function EditProfile() {
       }
 
       // Make API call to update profile
-      const response = await axiosInstance.put(API_PATHS.AUTH.UPDATE_PROFILE, updateData);
-      
+      const response = await axiosInstance.put(
+        API_PATHS.AUTH.UPDATE_PROFILE,
+        updateData
+      );
+
       // Update user context with new data
       updateUser(response.data);
-      
+
       toast.success("Profile updated successfully");
-      
+
       // Clear all form fields after successful update
       setFullName("");
       setEmail("");
       setProfilePic(null);
       setNewPassword("");
       setConfirmPassword("");
-      
     } catch (err) {
       if (err.response && err.response.data.message) {
         setError(err.response.data.message);
       } else {
         setError("Something went wrong. Please try again");
       }
-      
+
       // Clear error message after 2 seconds
       setTimeout(() => clearErrorAndField(), 2000);
     } finally {
@@ -150,8 +152,11 @@ export default function EditProfile() {
             </h2>
 
             <form onSubmit={handleUpdateProfile}>
-              <ProfilePhotoSelector image={profilePic} setImage={setProfilePic} />
-              
+              <ProfilePhotoSelector
+                image={profilePic}
+                setImage={setProfilePic}
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
                   value={fullName}
@@ -192,13 +197,9 @@ export default function EditProfile() {
               </div>
 
               {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}
-              
+
               <div className="flex justify-end mt-7">
-                <button
-                  type="submit"
-                  className="add-btn"
-                  disabled={loading}
-                >
+                <button type="submit" className="add-btn" disabled={loading}>
                   {loading ? "UPDATING..." : "UPDATE PROFILE"}
                 </button>
               </div>

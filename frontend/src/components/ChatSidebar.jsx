@@ -1,24 +1,26 @@
-import { useState, useEffect } from 'react';
-import { LuMessageSquare, LuUsers, LuX, LuSend } from 'react-icons/lu';
-import axiosInstance from '../utils/axiosInstance';
-import { API_PATHS } from '../utils/apiPaths';
-import { socket } from '../components/utils/socket';
+import { useState, useEffect } from "react";
+import { LuMessageSquare, LuUsers, LuX, LuSend } from "react-icons/lu";
+import axiosInstance from "../utils/axiosInstance";
+import { API_PATHS } from "../utils/apiPaths";
+import { socket } from "../components/utils/socket";
 
 const ChatSidebar = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState('direct'); // 'direct' or 'groups'
+  const [activeTab, setActiveTab] = useState("direct"); // 'direct' or 'groups'
   const [conversations, setConversations] = useState([]);
   const [groups, setGroups] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null); // {type: 'direct' or 'group', id: userId or groupId}
   const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [newMessage, setNewMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const fetchConversations = async () => {
     try {
-      const response = await axiosInstance.get(API_PATHS.MESSAGES.GET_CONVERSATIONS);
+      const response = await axiosInstance.get(
+        API_PATHS.MESSAGES.GET_CONVERSATIONS
+      );
       setConversations(response.data.conversations);
     } catch (error) {
-      console.error('Error fetching conversations:', error);
+      console.error("Error fetching conversations:", error);
     }
   };
 
@@ -27,14 +29,14 @@ const ChatSidebar = ({ isOpen, onClose }) => {
       const response = await axiosInstance.get(API_PATHS.MESSAGES.GET_GROUPS);
       setGroups(response.data.groups);
     } catch (error) {
-      console.error('Error fetching groups:', error);
+      console.error("Error fetching groups:", error);
     }
   };
 
   const fetchMessages = async () => {
     try {
       let response;
-      if (selectedChat.type === 'direct') {
+      if (selectedChat.type === "direct") {
         response = await axiosInstance.get(
           API_PATHS.MESSAGES.GET_DIRECT_MESSAGES(selectedChat.id)
         );
@@ -45,14 +47,14 @@ const ChatSidebar = ({ isOpen, onClose }) => {
       }
       setMessages(response.data.messages.reverse()); // Reverse to show oldest first
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error("Error fetching messages:", error);
     }
   };
 
   // Fetch conversations and groups
   useEffect(() => {
     if (isOpen) {
-      if (activeTab === 'direct') {
+      if (activeTab === "direct") {
         fetchConversations();
       } else {
         fetchGroups();
@@ -66,49 +68,63 @@ const ChatSidebar = ({ isOpen, onClose }) => {
       fetchMessages();
     }
   }, [selectedChat]);
-  
+
   // Handle profile updates
   useEffect(() => {
     const handleProfileUpdate = (data) => {
       // Update conversations with new profile image
-      setConversations(prevConversations => 
-        prevConversations.map(conv => 
-          conv.user._id === data.userId 
-            ? { ...conv, user: { ...conv.user, profileImageUrl: data.profileImageUrl, name: data.name } }
+      setConversations((prevConversations) =>
+        prevConversations.map((conv) =>
+          conv.user._id === data.userId
+            ? {
+                ...conv,
+                user: {
+                  ...conv.user,
+                  profileImageUrl: data.profileImageUrl,
+                  name: data.name,
+                },
+              }
             : conv
         )
       );
-      
+
       // Update messages if the sender is the updated user
-      setMessages(prevMessages => 
-        prevMessages.map(message => 
+      setMessages((prevMessages) =>
+        prevMessages.map((message) =>
           message.sender._id === data.userId
-            ? { ...message, sender: { ...message.sender, profileImageUrl: data.profileImageUrl, name: data.name } }
+            ? {
+                ...message,
+                sender: {
+                  ...message.sender,
+                  profileImageUrl: data.profileImageUrl,
+                  name: data.name,
+                },
+              }
             : message
         )
       );
     };
-    
+
     const handleWindowProfileUpdate = (e) => {
       handleProfileUpdate(e.detail);
     };
-    
+
     // Also refresh conversations to ensure latest data
     const handleProfileUpdateAndRefresh = (data) => {
       handleProfileUpdate(data);
-      if (activeTab === 'direct') {
+      if (activeTab === "direct") {
         fetchConversations();
       } else {
         fetchGroups();
       }
     };
-    
-    socket.on('profileUpdated', handleProfileUpdateAndRefresh);
-    window.addEventListener('profileUpdated', handleWindowProfileUpdate);
-    
+
+    socket.on("profileUpdated", handleProfileUpdateAndRefresh);
+    window.addEventListener("profileUpdated", handleWindowProfileUpdate);
+
     return () => {
-      socket.off('profileUpdated', handleProfileUpdateAndRefresh);
-      window.removeEventListener('profileUpdated', handleWindowProfileUpdate);
+      socket.off("profileUpdated", handleProfileUpdateAndRefresh);
+      window.removeEventListener("profileUpdated", handleWindowProfileUpdate);
     };
   }, [activeTab, fetchConversations, fetchGroups]);
 
@@ -118,26 +134,32 @@ const ChatSidebar = ({ isOpen, onClose }) => {
     try {
       const messageData = {
         content: newMessage,
-        messageType: 'text'
+        messageType: "text",
       };
 
-      if (selectedChat.type === 'direct') {
+      if (selectedChat.type === "direct") {
         messageData.recipientId = selectedChat.id;
-        await axiosInstance.post(API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE, messageData);
+        await axiosInstance.post(
+          API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE,
+          messageData
+        );
       } else {
         messageData.groupId = selectedChat.id;
-        await axiosInstance.post(API_PATHS.MESSAGES.SEND_GROUP_MESSAGE, messageData);
+        await axiosInstance.post(
+          API_PATHS.MESSAGES.SEND_GROUP_MESSAGE,
+          messageData
+        );
       }
 
-      setNewMessage('');
+      setNewMessage("");
       fetchMessages(); // Refresh messages
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error("Error sending message:", error);
     }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
@@ -164,22 +186,22 @@ const ChatSidebar = ({ isOpen, onClose }) => {
           <div className="flex gap-2">
             <button
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium ${
-                activeTab === 'direct'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
+                activeTab === "direct"
+                  ? "bg-blue-100 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-100"
               }`}
-              onClick={() => setActiveTab('direct')}
+              onClick={() => setActiveTab("direct")}
             >
               <LuMessageSquare className="inline mr-2" />
               Direct
             </button>
             <button
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium ${
-                activeTab === 'groups'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
+                activeTab === "groups"
+                  ? "bg-blue-100 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-100"
               }`}
-              onClick={() => setActiveTab('groups')}
+              onClick={() => setActiveTab("groups")}
             >
               <LuUsers className="inline mr-2" />
               Groups
@@ -191,7 +213,9 @@ const ChatSidebar = ({ isOpen, onClose }) => {
         <div className="p-4 border-b">
           <input
             type="text"
-            placeholder={`Search ${activeTab === 'direct' ? 'conversations' : 'groups'}...`}
+            placeholder={`Search ${
+              activeTab === "direct" ? "conversations" : "groups"
+            }...`}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -203,24 +227,37 @@ const ChatSidebar = ({ isOpen, onClose }) => {
           <div className="flex-1 flex flex-col">
             {/* Chat Header */}
             <div className="p-4 border-b flex items-center gap-3">
-              {selectedChat.type === 'direct' ? (
+              {selectedChat.type === "direct" ? (
                 <>
-                  {conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl ? (
+                  {conversations.find((c) => c.user._id === selectedChat.id)
+                    ?.user.profileImageUrl ? (
                     <img
-                      src={conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl}
-                      alt={conversations.find(c => c.user._id === selectedChat.id)?.user.name}
+                      src={
+                        conversations.find(
+                          (c) => c.user._id === selectedChat.id
+                        )?.user.profileImageUrl
+                      }
+                      alt={
+                        conversations.find(
+                          (c) => c.user._id === selectedChat.id
+                        )?.user.name
+                      }
                       className="w-10 h-10 rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
                       <span className="text-sm font-medium text-white">
-                        {conversations.find(c => c.user._id === selectedChat.id)?.user.name.charAt(0).toUpperCase() || 'U'}
+                        {conversations
+                          .find((c) => c.user._id === selectedChat.id)
+                          ?.user.name.charAt(0)
+                          .toUpperCase() || "U"}
                       </span>
                     </div>
                   )}
                   <div>
                     <h4 className="font-medium text-gray-900">
-                      {conversations.find(c => c.user._id === selectedChat.id)?.user.name || 'User'}
+                      {conversations.find((c) => c.user._id === selectedChat.id)
+                        ?.user.name || "User"}
                     </h4>
                     <p className="text-sm text-gray-500">Online</p>
                   </div>
@@ -232,10 +269,15 @@ const ChatSidebar = ({ isOpen, onClose }) => {
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-900">
-                      {groups.find(g => g._id === selectedChat.id)?.name || 'Group'}
+                      {groups.find((g) => g._id === selectedChat.id)?.name ||
+                        "Group"}
                     </h4>
                     <p className="text-sm text-gray-500">
-                      {groups.find(g => g._id === selectedChat.id)?.members.length} members
+                      {
+                        groups.find((g) => g._id === selectedChat.id)?.members
+                          .length
+                      }{" "}
+                      members
                     </p>
                   </div>
                 </>
@@ -247,9 +289,13 @@ const ChatSidebar = ({ isOpen, onClose }) => {
               {messages.map((message) => (
                 <div
                   key={message._id}
-                  className={`flex ${message.sender._id === localStorage.getItem('userId') ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${
+                    message.sender._id === localStorage.getItem("userId")
+                      ? "justify-end"
+                      : "justify-start"
+                  }`}
                 >
-                  {message.sender._id !== localStorage.getItem('userId') && (
+                  {message.sender._id !== localStorage.getItem("userId") && (
                     <div className="mr-2 flex-shrink-0">
                       {message.sender.profileImageUrl ? (
                         <img
@@ -268,19 +314,29 @@ const ChatSidebar = ({ isOpen, onClose }) => {
                   )}
                   <div
                     className={`max-w-xs px-4 py-2 rounded-lg ${
-                      message.sender._id === localStorage.getItem('userId')
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-800'
+                      message.sender._id === localStorage.getItem("userId")
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-100 text-gray-800"
                     }`}
                   >
-                    {message.sender._id !== localStorage.getItem('userId') && selectedChat?.type === 'group' && (
-                      <p className="text-xs font-medium text-gray-600 mb-1">
-                        {message.sender.name}
-                      </p>
-                    )}
+                    {message.sender._id !== localStorage.getItem("userId") &&
+                      selectedChat?.type === "group" && (
+                        <p className="text-xs font-medium text-gray-600 mb-1">
+                          {message.sender.name}
+                        </p>
+                      )}
                     <p className="text-sm">{message.content}</p>
-                    <p className={`text-xs mt-1 ${message.sender._id === localStorage.getItem('userId') ? 'text-blue-100' : 'text-gray-500'}`}>
-                      {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <p
+                      className={`text-xs mt-1 ${
+                        message.sender._id === localStorage.getItem("userId")
+                          ? "text-blue-100"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      {new Date(message.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </p>
                   </div>
                 </div>
@@ -311,70 +367,81 @@ const ChatSidebar = ({ isOpen, onClose }) => {
         ) : (
           /* Chat List View */
           <div className="flex-1 overflow-y-auto">
-            {activeTab === 'direct' ? (
-              conversations.map((conv) => (
-                <div
-                  key={conv.user._id}
-                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
-                    selectedChat?.type === 'direct' && selectedChat?.id === conv.user._id
-                      ? 'bg-blue-50'
-                      : ''
-                  }`}
-                  onClick={() => setSelectedChat({ type: 'direct', id: conv.user._id })}
-                >
-                  <div className="flex items-center gap-3">
-                    {conv.user.profileImageUrl ? (
-                      <img
-                        src={conv.user.profileImageUrl}
-                        alt={conv.user.name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                        <span className="text-sm font-medium text-white">
-                          {conv.user.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center">
-                        <h4 className="font-medium text-gray-900 truncate">{conv.user.name}</h4>
-                        {conv.unreadCount > 0 && (
-                          <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                            {conv.unreadCount}
+            {activeTab === "direct"
+              ? conversations.map((conv) => (
+                  <div
+                    key={conv.user._id}
+                    className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
+                      selectedChat?.type === "direct" &&
+                      selectedChat?.id === conv.user._id
+                        ? "bg-blue-50"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setSelectedChat({ type: "direct", id: conv.user._id })
+                    }
+                  >
+                    <div className="flex items-center gap-3">
+                      {conv.user.profileImageUrl ? (
+                        <img
+                          src={conv.user.profileImageUrl}
+                          alt={conv.user.name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
+                          <span className="text-sm font-medium text-white">
+                            {conv.user.name.charAt(0).toUpperCase()}
                           </span>
-                        )}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-medium text-gray-900 truncate">
+                            {conv.user.name}
+                          </h4>
+                          {conv.unreadCount > 0 && (
+                            <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                              {conv.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 truncate">
+                          {conv.lastMessage}
+                        </p>
                       </div>
-                      <p className="text-sm text-gray-500 truncate">{conv.lastMessage}</p>
                     </div>
                   </div>
-                </div>
-              ))
-            ) : (
-              groups.map((group) => (
-                <div
-                  key={group._id}
-                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
-                    selectedChat?.type === 'group' && selectedChat?.id === group._id
-                      ? 'bg-blue-50'
-                      : ''
-                  }`}
-                  onClick={() => setSelectedChat({ type: 'group', id: group._id })}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                      <LuUsers className="text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-gray-900 truncate">{group.name}</h4>
-                      <p className="text-sm text-gray-500">
-                        {group.members.length} member{group.members.length !== 1 ? 's' : ''}
-                      </p>
+                ))
+              : groups.map((group) => (
+                  <div
+                    key={group._id}
+                    className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
+                      selectedChat?.type === "group" &&
+                      selectedChat?.id === group._id
+                        ? "bg-blue-50"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setSelectedChat({ type: "group", id: group._id })
+                    }
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                        <LuUsers className="text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-gray-900 truncate">
+                          {group.name}
+                        </h4>
+                        <p className="text-sm text-gray-500">
+                          {group.members.length} member
+                          {group.members.length !== 1 ? "s" : ""}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))}
           </div>
         )}
       </div>

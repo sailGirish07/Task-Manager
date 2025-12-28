@@ -32,7 +32,7 @@ export const API_PATHS = {
     CREATE_TASK: "/api/tasks", // Create a new task (Admin only)                           ok
     UPDATE_TASK: (taskId) => `/api/tasks/${taskId}`, // Update task details
     DELETE_TASK: (taskId) => `/api/tasks/${taskId}`, // Delete a task (Admin only)
-    
+
     UPDATE_TASK_STATUS: (taskId) => `/api/tasks/${taskId}/status`, // Update task status
     UPDATE_TODO_CHECKLIST: (taskId) => `/api/tasks/${taskId}/todo`, // Update todo checklist
     UPLOAD_ATTACHMENT: "/api/tasks/upload-attachment", // Upload task attachment
@@ -44,7 +44,7 @@ export const API_PATHS = {
   },
 
   IMAGE: {
-    UPLOAD_IMAGE: "/api/auth/upload-image",  // ok (Gives an link to set the profileImage)
+    UPLOAD_IMAGE: "/api/auth/upload-image", // ok (Gives an link to set the profileImage)
   },
 
   NOTIFICATIONS: {
@@ -60,16 +60,18 @@ export const API_PATHS = {
     GET_DIRECT_MESSAGES: (userId) => `/api/messages/direct/${userId}`, // Get direct messages with user
     MARK_MESSAGES_AS_READ: "/api/messages/direct/read", // Mark direct messages as read
     UPDATE_MESSAGE_STATUS: "/api/messages/direct/delivered", // Update message status to delivered
-    
+
     // Group messaging
     SEND_GROUP_MESSAGE: "/api/messages/group", // Send group message
     GET_GROUP_MESSAGES: (groupId) => `/api/messages/group/${groupId}`, // Get group messages
     GET_GROUPS: "/api/messages/groups", // Get user's groups
     CREATE_GROUP: "/api/messages/groups", // Create a new group
-    ADD_MEMBER_TO_GROUP: (groupId, userId) => `/api/messages/groups/${groupId}/members/${userId}`, // Add member to group
-    REMOVE_MEMBER_FROM_GROUP: (groupId, userId) => `/api/messages/groups/${groupId}/members/${userId}`, // Remove member from group
+    ADD_MEMBER_TO_GROUP: (groupId, userId) =>
+      `/api/messages/groups/${groupId}/members/${userId}`, // Add member to group
+    REMOVE_MEMBER_FROM_GROUP: (groupId, userId) =>
+      `/api/messages/groups/${groupId}/members/${userId}`, // Remove member from group
     DELETE_MESSAGE: (messageId) => `/api/messages/${messageId}`, // Delete a message
-    
+
     // Conversations
     GET_CONVERSATIONS: "/api/messages/conversations", // Get user's conversations
     GET_GROUP_CONVERSATIONS: "/api/messages/group-conversations", // Get user's group conversations

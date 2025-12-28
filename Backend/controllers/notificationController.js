@@ -42,35 +42,6 @@ const markAsRead = async (req, res) => {
   }
 };
 
-// Mark all notifications as read
-const markAllAsRead = async (req, res) => {
-  try {
-    // Find notifications for the user (using both userId and recipient fields)
-    const notifications = await Notification.find({
-      $or: [
-        { userId: req.user._id },
-        { recipient: req.user._id }
-      ],
-      read: false
-    });
-    
-    // Get the IDs of unread notifications
-    const notificationIds = notifications.map(notification => notification._id);
-    
-    // Update all these notifications to be read
-    if (notificationIds.length > 0) {
-      await Notification.updateMany(
-        { _id: { $in: notificationIds } },
-        { read: true }
-      );
-    }
-
-    res.json({ message: "All notifications marked as read" });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
 // Delete a notification
 const deleteNotification = async (req, res) => {
   try {
@@ -88,26 +59,8 @@ const deleteNotification = async (req, res) => {
   }
 };
 
-// Delete all notifications
-const deleteAllNotifications = async (req, res) => {
-  try {
-    await Notification.deleteMany({ 
-      $or: [
-        { userId: req.user._id },
-        { recipient: req.user._id }
-      ]
-    });
-
-    res.json({ message: "All notifications deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
 module.exports = {
   getNotifications,
   markAsRead,
-  markAllAsRead,
   deleteNotification,
-  deleteAllNotifications,
 };

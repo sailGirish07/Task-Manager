@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { LuSend, LuUsers, LuMessageSquare, LuPlus, LuX, LuPaperclip } from 'react-icons/lu';
 import axiosInstance from '../utils/axiosInstance';
 import { API_PATHS } from '../utils/apiPaths';
-import { socket } from '../components/utils/socket';
+import { socket } from '../utils/socket';
 
 const Chat = () => {
   const [activeTab, setActiveTab] = useState('direct'); // 'direct' or 'groups'
