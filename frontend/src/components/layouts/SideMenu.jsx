@@ -85,7 +85,7 @@ export default function SideMenu({ activeMenu }) {
     return () => {};
   }, [user]);
   return (
-    <div className="w-64 h-[calc(100vh-61px)] bg-white border-r border-gray-200/50 sticky top-[61px] z-20">
+    <div className="w-64 h-[calc(100vh-61px)] bg-white border-r border-gray-200/50 sticky top-[61px] z-20 lg:w-64 lg:static lg:h-auto lg:z-auto lg:top-auto lg:border-r lg:border-b-0">
       <div className="flex flex-col items-center justify-center mb-7 pt-5 relative">
         <input
           type="file"
@@ -130,11 +130,9 @@ export default function SideMenu({ activeMenu }) {
           </div>
         )}
 
-        {user?.role === "admin" && (
-          <div className="text-[10px] font-medium text-white bg-primary px-3 py-0.5 rounded mt-1">
-            Admin
-          </div>
-        )}
+        <div className="text-[10px] font-medium text-white bg-primary px-3 py-0.5 rounded mt-1">
+          {user?.role === "admin" ? "Admin" : "Member"}
+        </div>
 
         <h5 className="text-gray-95 font-medium leading-6 mt-3">
           {user?.name || ""}

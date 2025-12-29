@@ -83,10 +83,10 @@ export default function Signup() {
       return;
     }
     
-    // Additional email validation: a-z, A-Z, 0-9, @, starts with lowercase letter, no spaces
-    const emailRegex = /^[a-z][a-zA-Z0-9]*@[a-zA-Z0-9]+\.[a-zA-Z]{2,}$/;
+    // Additional email validation: allows common email formats, no spaces
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
-      setError("Email must start with lowercase letter, contain only letters/numbers/@, and no spaces");
+      setError("Please enter a valid email address");
       setTimeout(() => setError(""), 2000);
       return;
     }

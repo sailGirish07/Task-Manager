@@ -72,6 +72,26 @@ io.on('connection', (socket) => {
     }
   });
   
+  // Handle typing indicators
+  socket.on('typing', (data) => {
+    if (data.recipientId && onlineUsers.has(data.recipientId)) {
+      io.to(onlineUsers.get(data.recipientId)).emit('typing', {
+        senderId: data.senderId,
+        isTyping: data.isTyping
+      });
+    }
+  });
+  
+  // Handle read receipts
+  socket.on('messageRead', (data) => {
+    if (data.senderId && onlineUsers.has(data.senderId)) {
+      io.to(onlineUsers.get(data.senderId)).emit('messageRead', {
+        recipientId: data.recipientId,
+        messageId: data.messageId
+      });
+    }
+  });
+  
   // Handle profile updates
   socket.on('profileUpdate', (data) => {
     // Broadcast profile update to all connected users except the sender

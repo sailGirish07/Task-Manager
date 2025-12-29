@@ -57,13 +57,13 @@ export default function Login() {
 
     if (!validateEmail(email)) {
       setError("Please enter a valid email address");
-      setTimeout(() => setError(""), 2000);
+      setTimeout(() => setError(""), 3000);
       return;
     }
 
     if (!password) {
       setError("Please enter the password");
-      setTimeout(() => setError(""), 2000);
+      setTimeout(() => setError(""), 3000);
       return;
     }
 
@@ -72,6 +72,7 @@ export default function Login() {
 
     // Show immediate loading feedback
     setSuccessMessage("Processing login...");
+    const successTimeout = setTimeout(() => setSuccessMessage(""), 3000);
 
     try {
       const response = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
@@ -82,16 +83,28 @@ export default function Login() {
       const { token, role } = response.data;
 
       if (token) {
+        // Clear the original processing message timeout and update message
+        clearTimeout(successTimeout);
+        setSuccessMessage("Login successful! Redirecting...");
+        
         localStorage.setItem("token", token);
         updateUser(response.data);
 
-        //Redirect based on the role
-        if (role === "admin") {
-          navigate("/admin/dashboard");
-        } else {
-          navigate("/user/dashboard");
-        }
+        // Redirect after showing the success message for 3 seconds
+        setTimeout(() => {
+          // Clear the message and navigate based on role
+          setSuccessMessage("");
+          if (role === "admin") {
+            navigate("/admin/dashboard");
+          } else {
+            navigate("/user/dashboard");
+          }
+        }, 3000);
       } else if (response.data.verificationRequired) {
+        // Clear the processing message and timeout
+        setSuccessMessage("");
+        clearTimeout(successTimeout);
+        
         // Show success message and redirect to verification page
         setSuccessMessage(
           "Verification code sent to your email. Please check your inbox."
@@ -107,6 +120,10 @@ export default function Login() {
         }, 2000); // 2 seconds to show message
       }
     } catch (err) {
+      // Clear the processing message first
+      setSuccessMessage("");
+      clearTimeout(successTimeout);
+      
       if (err.response && err.response.data.message) {
         setError(err.response.data.message);
         // Show resend link if server indicates it's needed
@@ -121,8 +138,8 @@ export default function Login() {
         setError("Something went wrong. Please try again");
       }
 
-      // Clear error message after 2 seconds
-      setTimeout(() => setError(""), 2000);
+      // Clear error message after 3 seconds to match other messages in the app
+      setTimeout(() => setError(""), 3000);
     }
   };
 

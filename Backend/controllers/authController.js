@@ -22,14 +22,11 @@ const registerUser = async (req, res) => {
 
     // Determine user role: Admin if correct token is provided, otherwise Member
     let role = "member";
-    let isAdminOwner = false;
-    
     if (
       adminInviteToken &&
       adminInviteToken == process.env.ADMIN_INVITE_TOKEN
     ) {
       role = "admin";
-      isAdminOwner = true; // Super admin can manage other admins
     }
 
     //Hash Password
@@ -47,7 +44,6 @@ const registerUser = async (req, res) => {
       password: hashedPassword,
       profileImageUrl,
       role,
-      isAdminOwner,
       verified: false  // User is created unverified
     });
 
@@ -80,19 +76,12 @@ const loginUser = async (req, res) => {
       // User already verified - generate token and login
       const token = generateToken(user._id);
       
-      // Get user permissions
-      const { ROLE_PERMISSIONS } = require('../config/permissions');
-      const permissions = ROLE_PERMISSIONS[user.role] || [];
-      
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
-        assignedTo: user.assignedTo,
-        isAdminOwner: user.isAdminOwner,
         profileImageUrl: user.profileImageUrl,
-        permissions: permissions, // Include permissions in response
         token: token,
       });
       return;
@@ -132,15 +121,7 @@ const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
-    
-    // Get user permissions
-    const { ROLE_PERMISSIONS } = require('../config/permissions');
-    const permissions = ROLE_PERMISSIONS[user.role] || [];
-    
-    res.json({
-      ...user._doc,
-      permissions: permissions // Include permissions in response
-    });
+    res.json(user);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -163,19 +144,12 @@ const updateUserProfile = async (req, res) => {
 
     const updatedUser = await user.save();
 
-    // Get user permissions
-    const { ROLE_PERMISSIONS } = require('../config/permissions');
-    const permissions = ROLE_PERMISSIONS[updatedUser.role] || [];
-    
     res.json({
       _id: updatedUser._id,
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
-      assignedTo: updatedUser.assignedTo,
-      isAdminOwner: updatedUser.isAdminOwner,
       profileImageUrl: updatedUser.profileImageUrl,
-      permissions: permissions, // Include permissions in response
       token: generateToken(updatedUser._id),
     });
   } catch (error) {
@@ -261,10 +235,6 @@ const verifyLoginCode = async (req, res) => {
     // Generate token for authenticated user
     const token = generateToken(user._id);
     
-    // Get user permissions
-    const { ROLE_PERMISSIONS } = require('../config/permissions');
-    const permissions = ROLE_PERMISSIONS[user.role] || [];
-    
     res.json({
       success: true,
       message: "Email verified successfully!",
@@ -272,10 +242,7 @@ const verifyLoginCode = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      assignedTo: user.assignedTo,
-      isAdminOwner: user.isAdminOwner,
       profileImageUrl: user.profileImageUrl,
-      permissions: permissions, // Include permissions in response
       token: token,
     });
   } catch (error) {
@@ -486,64 +453,4 @@ const verifyPasswordResetCode = async (req, res) => {
   }
 };
 
-// Create a new user by admin (admin only)
-const createUserByAdmin = async (req, res) => {
-  try {
-    const { name, email, password, profileImageUrl, role = "member", assignedTo } = req.body;
-
-    // Check if user already exists
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    // Only admins can create users
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Access denied. Only admins can create users." });
-    }
-
-    // Regular admins can only create members
-    if (req.user.role === "admin" && role !== "member") {
-      return res.status(403).json({ message: "Access denied. Regular admins can only create members." });
-    }
-
-    // If assignedTo is provided, verify it's the current admin or a sub-admin they manage
-    if (assignedTo && req.user.role === "admin") {
-      if (assignedTo.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ message: "Access denied. Can only assign to self." });
-      }
-    }
-
-    // Hash Password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create new user
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      profileImageUrl,
-      role,
-      assignedTo: assignedTo || (role === "member" ? req.user._id : null), // Members are assigned to the creating admin
-      isAdminOwner: false, // Regular users created by admins don't own other users
-      verified: true  // Admin-created users are automatically verified
-    });
-
-    res.status(201).json({
-      message: "User created successfully!",
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        assignedTo: user.assignedTo,
-        profileImageUrl: user.profileImageUrl
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
-module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, verifyCode, resendVerificationEmail, verifyLoginCode, forgotPassword, resetPassword, verifyPasswordResetCode, createUserByAdmin };
+module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, verifyCode, resendVerificationEmail, verifyLoginCode, forgotPassword, resetPassword, verifyPasswordResetCode };

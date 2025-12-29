@@ -24,6 +24,7 @@ export default function AddAttachmentsInput({ attachments, setAttachments, id })
   //Function to handle file upload
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
+    
     if (!file) return;
 
     setUploading(true);

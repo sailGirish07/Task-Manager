@@ -224,16 +224,16 @@ export default function CreateTask() {
   return (
     <DashboardLayout activeMenu="Create Task">
       <div className="mt-5">
-        <div className="grid grid-cols-1 md:grid-cols-4 mt-4">
-          <div className="form-card col-span-3">
-            <div className="flex items-center justify-between">
+        <div className="grid grid-cols-1 lg:grid-cols-4 mt-4">
+          <div className="form-card col-span-3 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <h2 className="text-xl md:text-xl font-medium">
                 {taskId ? "Update Task" : "Create Task"}
               </h2>
 
               {taskId && (
                 <button
-                  className="flex items-center gap-1.5 text-[13px] font-medium text-rose-500 bg-rose-50 rounded px-2 py-1 border border-rose-100 hover:border-rose-300 cursor-pointer"
+                  className="flex items-center gap-1.5 text-[13px] font-medium text-rose-500 bg-rose-50 rounded px-2 py-1 border border-rose-100 hover:border-rose-300 cursor-pointer self-start sm:self-auto"
                   onClick={() => setOpenDeleteAlert(true)}
                 >
                   <LuTrash2 className="text-base" />
@@ -274,8 +274,8 @@ export default function CreateTask() {
               />
             </div>
 
-            <div className="grid grid-cols-12 gap-4 mt-2">
-              <div className="col-span-6 md:col-span-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+              <div className="lg:col-span-1">
                 <label htmlFor="task-priority" className="text-xs font-medium text-slate-600">
                   Priority
                 </label>
@@ -288,13 +288,13 @@ export default function CreateTask() {
                 />
               </div>
 
-              <div className="cols-span-6 md:col-span-4">
+              <div className="lg:col-span-1">
                 <label htmlFor="task-due-date" className="text-xs font-medium text-slate-600">
                   Due Date
                 </label>
                 <input
                   id="task-due-date"
-                  placeholder="Create App UI"
+                  placeholder="Select date"
                   className="form-input"
                   value={taskData.dueDate || ""}
                   onChange={({ target }) =>
@@ -304,7 +304,7 @@ export default function CreateTask() {
                 />
               </div>
 
-              <div className="col-span-12 md:col-span-3">
+              <div className="md:col-span-2 lg:col-span-2">
                 <label htmlFor="task-assign-to" className="text-xs font-medium text-slate-600">
                   Assign To
                 </label>
@@ -352,7 +352,7 @@ export default function CreateTask() {
             )}
             <div className="flex justify-end mt-7">
               <button
-                className="add-btn"
+                className="add-btn w-full sm:w-auto"
                 onClick={handleSubmit}
                 disabled={loading}
               >
