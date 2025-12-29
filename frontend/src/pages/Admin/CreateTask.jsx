@@ -6,7 +6,7 @@ import { API_PATHS } from "../../utils/apiPaths";
 import toast from "react-hot-toast";
 import { useLocation, useNavigate } from "react-router-dom";
 import moment from "moment";
-import { LuTrash, LuTrash2 } from "react-icons/lu";
+import { LuTrash2 } from "react-icons/lu";
 import SelectDropDown from "../../components/Inputs/SelectDropDown";
 import SelectUsers from "../../components/Inputs/SelectUsers";
 import TodoListInput from "../../components/Inputs/TodoListInput";
@@ -58,7 +58,7 @@ export default function CreateTask() {
     try {
       // Validate date before sending to backend
       const dueDateObj = new Date(taskData.dueDate);
-      if (isNaN(dueDateObj.getTime())) {
+      if (Number.isNaN(dueDateObj.getTime())) {
         throw new Error("Invalid date format");
       }
 
@@ -92,7 +92,7 @@ export default function CreateTask() {
     try {
       // Validate date before sending to backend
       const dueDateObj = new Date(taskData.dueDate);
-      if (isNaN(dueDateObj.getTime())) {
+      if (Number.isNaN(dueDateObj.getTime())) {
         throw new Error("Invalid date format");
       }
 
@@ -145,7 +145,7 @@ export default function CreateTask() {
       return;
     }
 
-    if (!taskData.dueDate || isNaN(new Date(taskData.dueDate).getTime())) {
+    if (!taskData.dueDate || Number.isNaN(new Date(taskData.dueDate).getTime())) {
       setError("Valid due date is required");
       return;
     }
@@ -168,7 +168,7 @@ export default function CreateTask() {
   };
 
   //get Task info by ID
-  const getTaskDetailsByID = async () => {
+  const getTaskDetailsByID = async (taskId) => {
     try {
       const response = await axiosInstance.get(
         API_PATHS.TASKS.GET_TASK_BY_ID(taskId)
@@ -243,10 +243,11 @@ export default function CreateTask() {
             </div>
 
             <div className="mt-4">
-              <label className="text-xs font-medium text-slate-600">
+              <label htmlFor="task-title" className="text-xs font-medium text-slate-600">
                 Task Title
               </label>
               <input
+                id="task-title"
                 placeholder="Create App UI"
                 className="form-input"
                 value={taskData.title}
@@ -257,11 +258,12 @@ export default function CreateTask() {
             </div>
 
             <div className="mt-3">
-              <label className="text-xs font-medium text-slate-600">
+              <label htmlFor="task-description" className="text-xs font-medium text-slate-600">
                 Description
               </label>
 
               <textarea
+                id="task-description"
                 placeholder="Describe Box"
                 className="form-input"
                 rows={4}
@@ -274,10 +276,11 @@ export default function CreateTask() {
 
             <div className="grid grid-cols-12 gap-4 mt-2">
               <div className="col-span-6 md:col-span-4">
-                <label className="text-xs font-medium text-slate-600">
+                <label htmlFor="task-priority" className="text-xs font-medium text-slate-600">
                   Priority
                 </label>
                 <SelectDropDown
+                  id="task-priority"
                   options={PRIORITY_DATA}
                   value={taskData.priority}
                   onChange={(value) => handleValueChange("priority", value)}
@@ -286,10 +289,11 @@ export default function CreateTask() {
               </div>
 
               <div className="cols-span-6 md:col-span-4">
-                <label className="text-xs font-medium text-slate-600">
+                <label htmlFor="task-due-date" className="text-xs font-medium text-slate-600">
                   Due Date
                 </label>
                 <input
+                  id="task-due-date"
                   placeholder="Create App UI"
                   className="form-input"
                   value={taskData.dueDate || ""}
@@ -301,11 +305,12 @@ export default function CreateTask() {
               </div>
 
               <div className="col-span-12 md:col-span-3">
-                <label className="text-xs font-medium text-slate-600">
+                <label htmlFor="task-assign-to" className="text-xs font-medium text-slate-600">
                   Assign To
                 </label>
 
                 <SelectUsers
+                  id="task-assign-to"
                   selectedUsers={taskData.assignedTo}
                   setSelectedUsers={(value) => {
                     handleValueChange("assignedTo", value);
@@ -315,12 +320,13 @@ export default function CreateTask() {
             </div>
 
             <div className="mt-3">
-              <label className="text-xs font-medium text-slate-600">
+              <label htmlFor="task-todo-checklist" className="text-xs font-medium text-slate-600">
                 Todo Checklist
               </label>
 
               <TodoListInput
-                todoList={taskData?.todoChecklist}
+                id="task-todo-checklist"
+                todoList={taskData.todoChecklist}
                 setTodoList={(value) =>
                   handleValueChange("todoChecklist", value)
                 }
@@ -328,11 +334,12 @@ export default function CreateTask() {
             </div>
 
             <div className="mt-3">
-              <label className="text-xs font-medium text-slate-600">
+              <label htmlFor="task-attachments" className="text-xs font-medium text-slate-600">
                 Add Attachments
               </label>
 
               <AddAttachmentsInput
+                id="task-attachments"
                 attachments={taskData?.attachments}
                 setAttachments={(value) =>
                   handleValueChange("attachments", value)

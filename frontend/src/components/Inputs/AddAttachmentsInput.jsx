@@ -4,7 +4,7 @@ import { LuPaperclip } from "react-icons/lu";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 
-export default function AddAttachmentsInput({ attachments, setAttachments }) {
+export default function AddAttachmentsInput({ attachments, setAttachments, id }) {
   const [option, setOption] = useState("");
   const [uploading, setUploading] = useState(false);
 
@@ -88,6 +88,7 @@ export default function AddAttachmentsInput({ attachments, setAttachments }) {
           <LuPaperclip className="text-gray-400" />
 
           <input
+            id={id}
             type="text"
             placeholder="Add File Link or Upload File"
             value={option}
