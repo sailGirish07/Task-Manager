@@ -5,7 +5,7 @@ import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import AvatarGroup from "../AvatarGroup";
 
-export default function SelectUsers({ selectedUsers, setSelectedUsers }) {
+export default function SelectUsers({ selectedUsers, setSelectedUsers, id }) {
   const [allUsers, setAllUser] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tempSelectedUsers, setTempSelectedUsers] = useState([]);
@@ -55,12 +55,12 @@ export default function SelectUsers({ selectedUsers, setSelectedUsers }) {
   return (
     <div className="space-y-4 mt-2">
       {selectedUserAvatars.length === 0 ? (
-        <button className="card-btn" onClick={() => setIsModalOpen(true)}>
+        <button id={id} className="card-btn" onClick={() => setIsModalOpen(true)}>
           <LuUsers className="text-sm" />
           Add Members
         </button>
       ) : (
-        <button className="card-btn" onClick={() => setIsModalOpen(true)}>
+        <button id={id} className="card-btn" onClick={() => setIsModalOpen(true)}>
           <LuUsers className="text-sm" />
           Edit Members ({selectedUserAvatars.length})
         </button>

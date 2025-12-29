@@ -6,6 +6,7 @@ export default function SelectDropDown({
   value,
   onChange,
   placeholder,
+  id,
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -17,6 +18,7 @@ export default function SelectDropDown({
   return (
     <div className="relative w-full">
       <button
+        id={id}
         onClick={() => setIsOpen(!isOpen)}
         className="w-full text-sm text-black outline-none bg-white border border-slate-100 px-2.5 py-3 rounded-md mt-2 flex justify-between items-center"
       >

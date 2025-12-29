@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
@@ -10,6 +10,7 @@ export default function EnterCode() {
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(60); // 60 seconds
   const [email, setEmail] = useState("");
+  const firstCodeInputRef = useRef(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,8 +38,9 @@ export default function EnterCode() {
 
   // Focus management for code inputs
   useEffect(() => {
-    const firstInput = document.getElementById("code-0");
-    if (firstInput) firstInput.focus();
+    if (firstCodeInputRef.current) {
+      firstCodeInputRef.current.focus();
+    }
   }, []);
 
   // Handle code input changes
@@ -160,6 +162,7 @@ export default function EnterCode() {
               <input
                 key={index}
                 id={`code-${index}`}
+                ref={index === 0 ? firstCodeInputRef : null}
                 type="text"
                 maxLength="1"
                 value={digit}
