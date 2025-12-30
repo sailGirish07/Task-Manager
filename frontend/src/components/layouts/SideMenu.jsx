@@ -96,10 +96,7 @@ export default function SideMenu({ activeMenu }) {
           disabled={isUploading}
         />
         {user?.profileImageUrl ? (
-          <div
-            className="relative group cursor-pointer"
-            onClick={triggerFileInput}
-          >
+          <div className="relative group">
             <img
               src={user?.profileImageUrl}
               alt="Profile Image"
@@ -110,22 +107,83 @@ export default function SideMenu({ activeMenu }) {
                 <div className="w-4 h-4 border-t-2 border-white border-solid rounded-full animate-spin"></div>
               </div>
             )}
-            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <span className="text-white text-xs">Change</span>
+
+            <div
+              className="absolute bottom-0 right-6 w-5 h-5 bg-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow cursor-pointer"
+              onClick={triggerFileInput}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-3 w-3 text-black"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+              </svg>
+            </div>
+            <div
+              className="absolute bottom-0 right-0 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow cursor-pointer"
+              onClick={() => {
+                // Function to remove profile image
+                axiosInstance
+                  .put(API_PATHS.AUTH.UPDATE_PROFILE, {
+                    profileImageUrl: "",
+                  })
+                  .then((response) => {
+                    updateUser(response.data);
+
+                    // Emit profile update event to notify other users
+                    socket.emit("profileUpdate", {
+                      userId: response.data._id,
+                      profileImageUrl: response.data.profileImageUrl,
+                      name: response.data.name,
+                    });
+
+                    // Update own profile in conversations
+                    window.dispatchEvent(
+                      new CustomEvent("profileUpdated", {
+                        detail: {
+                          userId: response.data._id,
+                          profileImageUrl: response.data.profileImageUrl,
+                          name: response.data.name,
+                        },
+                      })
+                    );
+                  })
+                  .catch((err) => {
+                    console.error("Error removing profile image:", err);
+                  });
+              }}
+            >
+              <svg
+                className="w-4 h-4 text-white"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M9 3a1 1 0 00-1 1v1H5a1 1 0 000 2h1v13a2 2 0 002 2h8a2 2 0 002-2V7h1a1 1 0 100-2h-3V4a1 1 0 00-1-1H9zm2 4a1 1 0 012 0v10a1 1 0 11-2 0V7zm-4 0a1 1 0 012 0v10a1 1 0 11-2 0V7zm8 0a1 1 0 012 0v10a1 1 0 11-2 0V7z" />
+              </svg>
             </div>
           </div>
         ) : (
-          <div
-            className="relative group cursor-pointer"
-            onClick={triggerFileInput}
-          >
+          <div className="relative group">
             <div className="w-20 h-20 bg-slate-400 rounded-full flex items-center justify-center">
               <span className="text-white text-2xl font-bold">
                 {user?.name?.charAt(0) || "U"}
               </span>
             </div>
-            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <span className="text-white text-xs">Upload</span>
+
+            <div
+              className="absolute bottom-0 right-6 w-5 h-5 bg-white/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              onClick={triggerFileInput}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-3 w-3 text-gray-900"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+              </svg>
             </div>
           </div>
         )}

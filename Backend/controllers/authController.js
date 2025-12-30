@@ -135,7 +135,10 @@ const updateUserProfile = async (req, res) => {
     }
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
-    user.profileImageUrl = req.body.profileImageUrl || user.profileImageUrl;
+    // Only update profileImageUrl if it's explicitly provided (including empty string to remove image)
+    if (req.body.profileImageUrl !== undefined) {
+      user.profileImageUrl = req.body.profileImageUrl;
+    }
 
     if (req.body.password) {
       const salt = await bcrypt.genSalt(10);

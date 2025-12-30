@@ -12,6 +12,10 @@ const MessagingModal = ({ isOpen, onClose }) => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -452,29 +456,69 @@ const MessagingModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedChat) return;
+  const sendMessage = async (fileToSend = null) => {
+    if ((!newMessage.trim() && !fileToSend) || !selectedChat) return;
 
     try {
       setError(null);
-      const messageData = {
-        content: newMessage,
-        messageType: "text",
-        recipientId: selectedChat.id,
-      };
+      
+      const formData = new FormData();
+      formData.append('recipientId', selectedChat.id);
+      formData.append('messageType', fileToSend ? 'file' : 'text');
+      
+      if (newMessage.trim()) {
+        formData.append('content', newMessage);
+      }
+      
+      if (fileToSend) {
+        formData.append('file', fileToSend);
+      }
 
+      // Send with progress tracking
       await axiosInstance.post(
         API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE,
-        messageData
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          onUploadProgress: (progressEvent) => {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(progress);
+          }
+        }
       );
 
       setNewMessage("");
+      setSelectedFile(null);
+      setFileName("");
+      setIsUploading(false);
+      setUploadProgress(0);
       await fetchMessages();
       
     } catch (error) {
       console.error("Error sending message:", error);
       setError("Failed to send message. Please try again.");
     }
+  };
+  
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        setError("File size exceeds 10MB limit");
+        return;
+      }
+      setSelectedFile(file);
+      setFileName(file.name);
+      setIsUploading(true);
+      setUploadProgress(0); // Reset progress
+      sendMessage(file); // Send the file immediately
+    }
+  };
+  
+  const triggerFileInput = () => {
+    document.getElementById('fileInput').click();
   };
 
   const handleKeyPress = (e) => {
@@ -742,6 +786,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                               id: conv.user._id,
                               name: conv.user.name,
                               email: conv.user.email,
+                               profileImageUrl: conv.user.profileImageUrl, 
                             });
                             setSearchTerm("");
                           }}
@@ -921,9 +966,17 @@ const MessagingModal = ({ isOpen, onClose }) => {
                 <div className="px-6 py-4 border-b flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <div className="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold">
-                        {getInitials(selectedChat.name)}
-                      </div>
+                      {selectedChat.profileImageUrl ? (
+                        <img
+                          src={selectedChat.profileImageUrl}
+                          alt={selectedChat.name}
+                          className="w-11 h-11 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold">
+                          {getInitials(selectedChat.name)}
+                        </div>
+                      )}
                       {/* Online/Offline Status for chat header */}
                       {selectedChat.type === "user" && (
                         <div
@@ -1004,7 +1057,60 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                   }
                                 >
                                   <div className="flex items-end gap-1.5">
-                                    <span>{msg.content}</span>
+                                    {msg.messageType === 'file' ? (
+                                      msg.fileType?.startsWith('image/') ? (
+                                        // Image file - show directly
+                                        <img
+                                          src={`${window.location.origin.replace(/:\d+$/, ':8000')}${msg.fileUrl}`}
+                                          alt={msg.fileName}
+                                          className="max-w-[120px] max-h-32 rounded-lg object-cover"
+                                          onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = '/placeholder-image.jpg'; // fallback image
+                                          }}
+                                        />
+                                      ) : (
+                                        // Non-image file - show as attachment
+                                        <a 
+                                          href={`${window.location.origin.replace(/:\d+$/, ':8000')}${msg.fileUrl}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex flex-col gap-1"
+                                        >
+                                          <div className="flex items-start gap-2 p-1.5 rounded bg-white border border-gray-200 hover:bg-gray-50 transition-colors">
+                                            <div className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center bg-gray-100">
+                                              {msg.fileType === 'application/pdf' ? (
+                                                <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                              ) : msg.fileType?.includes('document') || msg.fileType?.includes('wordprocessing') ? (
+                                                <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                              ) : msg.fileType?.includes('zip') || msg.fileType?.includes('compressed') ? (
+                                                <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                                                </svg>
+                                              ) : (
+                                                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                              )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                              <div className="font-medium text-xs truncate">{msg.fileName}</div>
+                                              <div className="text-[10px] text-gray-500">
+                                                {`${msg.fileSize > 1024 * 1024 
+                                                  ? `${(msg.fileSize / (1024 * 1024)).toFixed(1)} MB` 
+                                                  : `${(msg.fileSize / 1024).toFixed(1)} KB`} • ${msg.fileType}`}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </a>
+                                      )
+                                    ) : (
+                                      <span>{msg.content}</span>
+                                    )}
                                     {isCurrentUser && (
                                       <>
                                         {/* Single tick - sent */}
@@ -1132,6 +1238,33 @@ const MessagingModal = ({ isOpen, onClose }) => {
                   
                   <div className="flex gap-3 items-center">
                     <input
+                      type="file"
+                      id="fileInput"
+                      className="hidden"
+                      onChange={handleFileChange}
+                      accept="image/*,application/pdf,.doc,.docx,.txt,.zip"
+                      multiple
+                    />
+                    <button
+                      onClick={triggerFileInput}
+                      className="p-3.5 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition-colors"
+                      title="Send file"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                        />
+                      </svg>
+                    </button>
+                    <input
                       className="flex-1 px-4 py-3 border border-gray-200 rounded-full text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Type a message..."
                       value={newMessage}
@@ -1139,8 +1272,8 @@ const MessagingModal = ({ isOpen, onClose }) => {
                       onKeyPress={handleKeyPress}
                     />
                     <button
-                      onClick={sendMessage}
-                      disabled={!newMessage.trim()}
+                      onClick={() => sendMessage()}
+                      disabled={!newMessage.trim() && !selectedFile}
                       className="p-3.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <svg
@@ -1158,6 +1291,36 @@ const MessagingModal = ({ isOpen, onClose }) => {
                       </svg>
                     </button>
                   </div>
+                  {selectedFile && (
+                    <div className="flex flex-col gap-2 p-2 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{selectedFile.name}</div>
+                          <div className="text-xs text-gray-500">{(selectedFile.size / 1024).toFixed(1)} KB</div>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setSelectedFile(null);
+                            setFileName("");
+                            setIsUploading(false);
+                          }}
+                          className="p-1 text-gray-500 hover:text-gray-700"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      {isUploading && (
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out"
+                            style={{ width: `${uploadProgress}%` }}
+                          ></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             ) : (

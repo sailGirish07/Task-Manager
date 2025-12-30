@@ -61,19 +61,9 @@ export const API_PATHS = {
     MARK_MESSAGES_AS_READ: "/api/messages/direct/read", // Mark direct messages as read
     UPDATE_MESSAGE_STATUS: "/api/messages/direct/delivered", // Update message status to delivered
 
-    // Group messaging
-    SEND_GROUP_MESSAGE: "/api/messages/group", // Send group message
-    GET_GROUP_MESSAGES: (groupId) => `/api/messages/group/${groupId}`, // Get group messages
-    GET_GROUPS: "/api/messages/groups", // Get user's groups
-    CREATE_GROUP: "/api/messages/groups", // Create a new group
-    ADD_MEMBER_TO_GROUP: (groupId, userId) =>
-      `/api/messages/groups/${groupId}/members/${userId}`, // Add member to group
-    REMOVE_MEMBER_FROM_GROUP: (groupId, userId) =>
-      `/api/messages/groups/${groupId}/members/${userId}`, // Remove member from group
     DELETE_MESSAGE: (messageId) => `/api/messages/${messageId}`, // Delete a message
 
     // Conversations
     GET_CONVERSATIONS: "/api/messages/conversations", // Get user's conversations
-    GET_GROUP_CONVERSATIONS: "/api/messages/group-conversations", // Get user's group conversations
   },
 };

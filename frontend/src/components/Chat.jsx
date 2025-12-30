@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LuSend, LuUsers, LuMessageSquare, LuPlus, LuX, LuPaperclip } from 'react-icons/lu';
+import { LuSend, LuMessageSquare, LuPaperclip } from 'react-icons/lu';
 import axiosInstance from '../utils/axiosInstance';
 import { API_PATHS } from '../utils/apiPaths';
 import { socket } from '../utils/socket';
 
 const Chat = () => {
-  const [activeTab, setActiveTab] = useState('direct'); // 'direct' or 'groups'
   const [conversations, setConversations] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [selectedChat, setSelectedChat] = useState(null); // {type: 'direct' or 'group', id: userId or groupId}
+  const [selectedChat, setSelectedChat] = useState(null); // {type: 'direct', id: userId}
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [createGroupData, setCreateGroupData] = useState({ name: '', description: '', members: [] });
-  const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -27,41 +27,22 @@ const Chat = () => {
     }
   };
 
-  const fetchGroups = async () => {
-    try {
-      const response = await axiosInstance.get(API_PATHS.MESSAGES.GET_GROUPS);
-      setGroups(response.data.groups);
-    } catch (error) {
-      console.error('Error fetching groups:', error);
-    }
-  };
+
 
   const fetchMessages = async () => {
     try {
-      let response;
-      if (selectedChat.type === 'direct') {
-        response = await axiosInstance.get(
-          API_PATHS.MESSAGES.GET_DIRECT_MESSAGES(selectedChat.id)
-        );
-      } else {
-        response = await axiosInstance.get(
-          API_PATHS.MESSAGES.GET_GROUP_MESSAGES(selectedChat.id)
-        );
-      }
+      const response = await axiosInstance.get(
+        API_PATHS.MESSAGES.GET_DIRECT_MESSAGES(selectedChat.id)
+      );
       setMessages(response.data.messages.reverse()); // Reverse to show oldest first
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
   };
 
-  // Fetch conversations and groups
   useEffect(() => {
-    if (activeTab === 'direct') {
-      fetchConversations();
-    } else {
-      fetchGroups();
-    }
-  }, [activeTab]);
+    fetchConversations();
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -108,11 +89,7 @@ const Chat = () => {
     // Also refresh conversations to ensure latest data
     const handleProfileUpdateAndRefresh = (data) => {
       handleProfileUpdate(data);
-      if (activeTab === 'direct') {
-        fetchConversations();
-      } else {
-        fetchGroups();
-      }
+      fetchConversations();
     };
     
     socket.on('profileUpdated', handleProfileUpdateAndRefresh);
@@ -122,60 +99,52 @@ const Chat = () => {
       socket.off('profileUpdated', handleProfileUpdateAndRefresh);
       window.removeEventListener('profileUpdated', handleWindowProfileUpdate);
     };
-  }, [activeTab, fetchConversations, fetchGroups]);
+  }, [fetchConversations]);
 
-  const fetchAllUsers = async () => {
-    try {
-      const response = await axiosInstance.get(API_PATHS.USERS.GET_ALL_USERS);
-      setUsers(response.data.users);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    }
-  };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedChat) return;
+
+  const sendMessage = async (fileToSend = null) => {
+    if ((!newMessage.trim() && !fileToSend) || !selectedChat) return;
 
     try {
-      const messageData = {
-        content: newMessage,
-        messageType: 'text'
-      };
-
-      if (selectedChat.type === 'direct') {
-        messageData.recipientId = selectedChat.id;
-        await axiosInstance.post(API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE, messageData);
-      } else {
-        messageData.groupId = selectedChat.id;
-        await axiosInstance.post(API_PATHS.MESSAGES.SEND_GROUP_MESSAGE, messageData);
+      const formData = new FormData();
+      formData.append('messageType', fileToSend ? 'file' : 'text');
+      
+      if (newMessage.trim()) {
+        formData.append('content', newMessage);
+      }
+      
+      if (fileToSend) {
+        formData.append('file', fileToSend);
       }
 
+      formData.append('recipientId', selectedChat.id);
+      await axiosInstance.post(
+        API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          onUploadProgress: (progressEvent) => {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(progress);
+          }
+        }
+      );
+
       setNewMessage('');
+      setSelectedFile(null);
+      setIsUploading(false);
       fetchMessages(); // Refresh messages
     } catch (error) {
       console.error('Error sending message:', error);
     }
   };
+  
 
-  const createGroup = async () => {
-    try {
-      await axiosInstance.post(API_PATHS.MESSAGES.CREATE_GROUP, createGroupData);
-      setShowCreateGroup(false);
-      setCreateGroupData({ name: '', description: '', members: [] });
-      fetchGroups(); // Refresh groups
-    } catch (error) {
-      console.error('Error creating group:', error);
-    }
-  };
 
-  const addMemberToGroup = async (groupId, userId) => {
-    try {
-      await axiosInstance.put(API_PATHS.MESSAGES.ADD_MEMBER_TO_GROUP(groupId, userId));
-      fetchGroups(); // Refresh groups
-    } catch (error) {
-      console.error('Error adding member to group:', error);
-    }
-  };
+
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -191,8 +160,14 @@ const Chat = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // File upload would be implemented here
-      console.log('File selected:', file);
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        alert('File size exceeds 10MB limit');
+        return;
+      }
+      setSelectedFile(file);
+      setIsUploading(true);
+      setUploadProgress(0); // Reset progress
+      sendMessage(file); // Send the file immediately
     }
   };
 
@@ -204,48 +179,21 @@ const Chat = () => {
         <div className="p-4 border-b">
           <div className="flex gap-2 mb-4">
             <button
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium ${
-                activeTab === 'direct'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-              onClick={() => setActiveTab('direct')}
+              className={`py-2 px-4 rounded-lg text-sm font-medium bg-blue-100 text-blue-700`}
             >
               <LuMessageSquare className="inline mr-2" />
               Direct
             </button>
-            <button
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium ${
-                activeTab === 'groups'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-              onClick={() => setActiveTab('groups')}
-            >
-              <LuUsers className="inline mr-2" />
-              Groups
-            </button>
           </div>
           
-          {activeTab === 'groups' && (
-            <button
-              className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-              onClick={() => {
-                setShowCreateGroup(true);
-                fetchAllUsers();
-              }}
-            >
-              <LuPlus className="inline mr-2" />
-              Create Group
-            </button>
-          )}
+
         </div>
 
         {/* Search */}
         <div className="p-4 border-b">
           <input
             type="text"
-            placeholder={`Search ${activeTab === 'direct' ? 'conversations' : 'groups'}...`}
+            placeholder="Search conversations..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -254,70 +202,49 @@ const Chat = () => {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto">
-          {activeTab === 'direct' ? (
-            conversations.map((conv) => (
-              <div
-                key={conv.user._id}
-                className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
-                  selectedChat?.type === 'direct' && selectedChat?.id === conv.user._id
-                    ? 'bg-blue-50'
-                    : ''
-                }`}
-                onClick={() => setSelectedChat({ type: 'direct', id: conv.user._id })}
-              >
-                <div className="flex items-center gap-3">
-                  {conv.user.profileImageUrl ? (
-                    <img
-                      src={conv.user.profileImageUrl}
-                      alt={conv.user.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                      <span className="text-sm font-medium text-white">
-                        {conv.user.name.charAt(0).toUpperCase()}
+          {conversations
+            .filter(conv => 
+              conv.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              conv.lastMessage.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .map((conv) => (
+            <div
+              key={conv.user._id}
+              className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
+                selectedChat?.type === 'direct' && selectedChat?.id === conv.user._id
+                  ? 'bg-blue-50'
+                  : ''
+              }`}
+              onClick={() => setSelectedChat({ type: 'direct', id: conv.user._id })}
+            >
+              <div className="flex items-center gap-3">
+                {conv.user.profileImageUrl ? (
+                  <img
+                    src={conv.user.profileImageUrl}
+                    alt={conv.user.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
+                    <span className="text-sm font-medium text-white">
+                      {conv.user.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-medium text-gray-900 truncate">{conv.user.name}</h4>
+                    {conv.unreadCount > 0 && (
+                      <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {conv.unreadCount}
                       </span>
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center">
-                      <h4 className="font-medium text-gray-900 truncate">{conv.user.name}</h4>
-                      {conv.unreadCount > 0 && (
-                        <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                          {conv.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 truncate">{conv.lastMessage}</p>
+                    )}
                   </div>
+                  <p className="text-sm text-gray-500 truncate">{conv.lastMessage}</p>
                 </div>
               </div>
-            ))
-          ) : (
-            groups.map((group) => (
-              <div
-                key={group._id}
-                className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
-                  selectedChat?.type === 'group' && selectedChat?.id === group._id
-                    ? 'bg-blue-50'
-                    : ''
-                }`}
-                onClick={() => setSelectedChat({ type: 'group', id: group._id })}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                    <LuUsers className="text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-900 truncate">{group.name}</h4>
-                    <p className="text-sm text-gray-500">
-                      {group.members.length} member{group.members.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -328,43 +255,27 @@ const Chat = () => {
             {/* Chat Header */}
             <div className="p-4 border-b flex items-center justify-between">
               <div className="flex items-center gap-3">
-                {selectedChat.type === 'direct' ? (
-                  <>
-                    {conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl ? (
-                      <img
-                        src={conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl}
-                        alt={conversations.find(c => c.user._id === selectedChat.id)?.user.name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                        <span className="text-sm font-medium text-white">
-                          {conversations.find(c => c.user._id === selectedChat.id)?.user.name.charAt(0).toUpperCase() || 'U'}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <h4 className="font-medium text-gray-900">
-                        {conversations.find(c => c.user._id === selectedChat.id)?.user.name || 'User'}
-                      </h4>
-                      <p className="text-sm text-gray-500">Online</p>
+                <>
+                  {conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl ? (
+                    <img
+                      src={conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl}
+                      alt={conversations.find(c => c.user._id === selectedChat.id)?.user.name}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
+                      <span className="text-sm font-medium text-white">
+                        {conversations.find(c => c.user._id === selectedChat.id)?.user.name.charAt(0).toUpperCase() || 'U'}
+                      </span>
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                      <LuUsers className="text-white" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">
-                        {groups.find(g => g._id === selectedChat.id)?.name || 'Group'}
-                      </h4>
-                      <p className="text-sm text-gray-500">
-                        {groups.find(g => g._id === selectedChat.id)?.members.length} members
-                      </p>
-                    </div>
-                  </>
-                )}
+                  )}
+                  <div>
+                    <h4 className="font-medium text-gray-900">
+                      {conversations.find(c => c.user._id === selectedChat.id)?.user.name || 'User'}
+                    </h4>
+                    <p className="text-sm text-gray-500">Online</p>
+                  </div>
+                </>
               </div>
             </div>
 
@@ -399,12 +310,61 @@ const Chat = () => {
                         : 'bg-gray-100 text-gray-800'
                     }`}
                   >
-                    {message.sender._id !== localStorage.getItem('userId') && selectedChat?.type === 'group' && (
-                      <p className="text-xs font-medium text-gray-600 mb-1">
-                        {message.sender.name}
-                      </p>
+
+                    {message.messageType === 'file' ? (
+                      message.fileType?.startsWith('image/') ? (
+                        // Image file - show directly
+                        <img
+                          src={`${window.location.origin.replace(/:\d+$/, ':8000')}${message.fileUrl}`}
+                          alt={message.fileName}
+                          className="max-w-[120px] max-h-32 rounded-lg object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = '/placeholder-image.jpg'; // fallback image
+                          }}
+                        />
+                      ) : (
+                        // Non-image file - show as attachment
+                        <a 
+                          href={`${window.location.origin.replace(/:\d+$/, ':8000')}${message.fileUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex flex-col gap-1"
+                        >
+                          <div className="flex items-start gap-2 p-1.5 rounded bg-white border border-gray-200 hover:bg-gray-50 transition-colors">
+                            <div className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center bg-gray-100">
+                              {message.fileType === 'application/pdf' ? (
+                                <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              ) : message.fileType?.includes('document') || message.fileType?.includes('wordprocessing') ? (
+                                <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              ) : message.fileType?.includes('zip') || message.fileType?.includes('compressed') ? (
+                                <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-xs truncate">{message.fileName}</div>
+                              <div className="text-[10px] text-gray-500">
+                                {`${message.fileSize > 1024 * 1024 
+                                  ? `${(message.fileSize / (1024 * 1024)).toFixed(1)} MB` 
+                                  : `${(message.fileSize / 1024).toFixed(1)} KB`} • ${message.fileType}`}
+                              </div>
+                            </div>
+                          </div>
+                        </a>
+                      )
+                    ) : (
+                      <p className="text-sm">{message.content}</p>
                     )}
-                    <p className="text-sm">{message.content}</p>
                     <p className={`text-xs mt-1 ${message.sender._id === localStorage.getItem('userId') ? 'text-blue-100' : 'text-gray-500'}`}>
                       {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
@@ -416,29 +376,60 @@ const Chat = () => {
 
             {/* Message Input */}
             <div className="p-4 border-t">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleFileUpload}
-                  className="p-2 text-gray-500 hover:text-gray-700"
-                  title="Attach file"
-                >
-                  <LuPaperclip className="text-lg" />
-                </button>
-                <input
-                  type="text"
-                  placeholder="Type a message..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={!newMessage.trim()}
-                  className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <LuSend className="text-lg" />
-                </button>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleFileUpload}
+                    className="p-2 text-gray-500 hover:text-gray-700"
+                    title="Attach file"
+                  >
+                    <LuPaperclip className="text-lg" />
+                  </button>
+                  <input
+                    type="text"
+                    placeholder="Type a message..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                  />
+                  <button
+                    onClick={() => sendMessage()}
+                    disabled={!newMessage.trim() && !selectedFile}
+                    className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <LuSend className="text-lg" />
+                  </button>
+                </div>
+                {selectedFile && (
+                  <div className="flex flex-col gap-2 p-2 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{selectedFile.name}</div>
+                        <div className="text-xs text-gray-500">{(selectedFile.size / 1024).toFixed(1)} KB</div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setIsUploading(false);
+                        }}
+                        className="p-1 text-gray-500 hover:text-gray-700"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    {isUploading && (
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </>
@@ -452,83 +443,14 @@ const Chat = () => {
         )}
       </div>
 
-      {/* Create Group Modal */}
-      {showCreateGroup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Create Group</h3>
-              <button onClick={() => setShowCreateGroup(false)} className="text-gray-500">
-                <LuX className="text-xl" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Group Name</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  value={createGroupData.name}
-                  onChange={(e) => setCreateGroupData({...createGroupData, name: e.target.value})}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  value={createGroupData.description}
-                  onChange={(e) => setCreateGroupData({...createGroupData, description: e.target.value})}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Add Members</label>
-                <select
-                  multiple
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  value={createGroupData.members}
-                  onChange={(e) => {
-                    const selectedOptions = Array.from(e.target.selectedOptions).map(option => option.value);
-                    setCreateGroupData({...createGroupData, members: selectedOptions});
-                  }}
-                >
-                  {users
-                    .filter(user => user._id !== localStorage.getItem('userId')) // Exclude current user
-                    .map(user => (
-                      <option key={user._id} value={user._id}>
-                        {user.name} ({user.email})
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={() => setShowCreateGroup(false)}
-                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={createGroup}
-                className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Create Group
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
       
       <input
         type="file"
         ref={fileInputRef}
         className="hidden"
         onChange={handleFileChange}
+        accept="image/*,application/pdf,.doc,.docx,.txt,.zip"
         multiple
       />
     </div>
