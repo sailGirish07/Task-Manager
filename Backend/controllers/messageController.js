@@ -197,14 +197,7 @@ const getUserConversations = async (req, res) => {
 
 
 
-// Get user's groups
-const getUserGroups = async (req, res) => {
-  try {
-    res.json({ groups: [] });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
+
 
 
 
@@ -327,7 +320,6 @@ module.exports = {
   getDirectMessages,
 
   getUserConversations,
-  getUserGroups,
   deleteMessage,
   markMessagesAsRead,
   updateMessageStatus,

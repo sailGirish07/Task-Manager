@@ -3,7 +3,6 @@ const {
   sendDirectMessage,
   getDirectMessages,
   getUserConversations,
-  getUserGroups,
   deleteMessage,
   markMessagesAsRead,
   updateMessageStatus

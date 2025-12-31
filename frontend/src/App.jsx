@@ -8,7 +8,7 @@ import {
 import React, { useContext } from "react";
 
 import PrivateRoute from "./routes/PrivateRoute";
-import { UserContext, UserProvider } from "./context/UserContext";
+import { UserContext } from "./context/UserContext";
 
 import Login from "./pages/Auth/Login";
 import Signup from "./pages/Auth/Signup";
@@ -51,7 +51,7 @@ const Root = () => {
 function App() {
   return (
     <>
-      <div>
+      <div className="min-h-screen transition-colors duration-300">
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
