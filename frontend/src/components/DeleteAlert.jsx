@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 
 export default function DeleteAlert({ content, onDelete }) {
   return (
@@ -16,3 +17,8 @@ export default function DeleteAlert({ content, onDelete }) {
     </div>
   );
 }
+
+DeleteAlert.propTypes = {
+  content: PropTypes.string.isRequired,
+  onDelete: PropTypes.func.isRequired,
+};
