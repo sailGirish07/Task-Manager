@@ -11,10 +11,7 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // For direct messages
     },
-    group: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Group", // For group messages
-    },
+
     content: {
       type: String,
       required: true,
@@ -24,6 +21,19 @@ const messageSchema = new mongoose.Schema(
       type: String,
       enum: ["text", "image", "file", "task_update"],
       default: "text",
+    },
+    // File-specific fields
+    fileUrl: {
+      type: String,
+    },
+    fileName: {
+      type: String,
+    },
+    fileSize: {
+      type: Number,
+    },
+    fileType: {
+      type: String,
     },
     status: {
       type: String,
@@ -68,7 +78,7 @@ const messageSchema = new mongoose.Schema(
 
 // Index for efficient querying
 messageSchema.index({ recipient: 1, createdAt: -1 });
-messageSchema.index({ group: 1, createdAt: -1 });
+
 messageSchema.index({ sender: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Message", messageSchema);

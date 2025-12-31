@@ -115,9 +115,6 @@ export default function SelectUsers({ selectedUsers, setSelectedUsers, id }) {
         </div>
 
         <div className="flex justify-end ga-4 pt-4">
-          <button className="card-btn" onClick={() => setIsModalOpen(false)}>
-            Cancel
-          </button>
           <button className="card-btn-fill" onClick={handleAssign}>
             Done
           </button>

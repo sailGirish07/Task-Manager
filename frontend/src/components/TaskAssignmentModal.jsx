@@ -1,8 +1,7 @@
-import React, { useState } from "react";
-import { LuX, LuUser, LuUsers } from "react-icons/lu";
+import React from "react";
+import { LuX, LuUser } from "react-icons/lu";
 
 const TaskAssignmentModal = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState("personal"); // 'personal' or 'groups'
 
   if (!isOpen) return null;
 
@@ -19,42 +18,14 @@ const TaskAssignmentModal = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Tabs for Personal and Groups */}
-        <div className="flex gap-2 mb-4">
-          <button
-            className={`px-4 py-2 rounded-lg font-medium ${
-              activeTab === "personal"
-                ? "bg-blue-100 text-blue-700"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-            onClick={() => setActiveTab("personal")}
-          >
-            <LuUser className="inline mr-2" />
-            Personal
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg font-medium ${
-              activeTab === "groups"
-                ? "bg-blue-100 text-blue-700"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-            onClick={() => setActiveTab("groups")}
-          >
-            <LuUsers className="inline mr-2" />
-            Groups
-          </button>
-        </div>
+
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-3 border-b">
             <div className="relative">
               <input
                 type="text"
-                placeholder={
-                  activeTab === "personal"
-                    ? "Search users..."
-                    : "Search groups..."
-                }
+                placeholder="Search users..."
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
               <svg
@@ -77,9 +48,7 @@ const TaskAssignmentModal = ({ isOpen, onClose }) => {
           <div className="p-4">
             {/* Content will be loaded based on active tab */}
             <div className="text-center text-gray-500 py-8">
-              {activeTab === "personal"
-                ? "Search for users to message"
-                : "Search for groups to message"}
+              Search for users to message
             </div>
           </div>
         </div>

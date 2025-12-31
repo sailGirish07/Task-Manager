@@ -29,61 +29,98 @@ export default function TaskListTable({ tableData = [] }) {
   };
 
   return (
-    <div className="overflow-x-auto p-0 rounded-lg mt-3">
-      <table className="min-w-full">
-        <thead>
-          <tr className="text-left">
-            <th className="py-3 px-4 text-gray-800 font-medium text-[13px]">
-              Name
-            </th>
-            <th className="py-3 px-4 text-gray-800 font-medium text-[13px]">
-              Status
-            </th>
-            <th className="py-3 px-4 text-gray-800 font-medium text-[13px]">
-              Priority
-            </th>
-            <th className="py-3 px-4 text-gray-800 font-medium text-[13px] hidden md:table-cell">
-              Created On
-            </th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {tableData.map((task) => (
-            <tr key={task._id} className="border-t border-gray-200">
-              <td className="my-3 mx-4 text-gray-700 text-[13px] line-clamp-1 overflow-hidden">
-                {task.title}
-              </td>
-
-              <td className="py-4 px-4">
-                <span
-                  className={`px-2 py-1 text-xs rounded inline-block ${getStatusBadgeColor(
-                    task.status
-                  )}`}
-                >
-                  {task.status}
-                </span>
-              </td>
-
-              <td className="py-4 px-4">
-                <span
-                  className={`px-2 py-1 text-xs rounded inline-block ${getPriorityBadgeColor(
-                    task.priority
-                  )}`}
-                >
-                  {task.priority}
-                </span>
-              </td>
-
-              <td className="py-4 px-4 text-gray-700 text-[13px] text-nowrap hidden md:table-cell">
-                {task.createdAt
-                  ? moment(task.createdAt).format("Do MMM YYYY")
-                  : "N/A"}
-              </td>
+    <div className="p-0 rounded-lg mt-3">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="min-w-full">
+          <thead>
+            <tr className="text-left">
+              <th className="py-3 px-4 text-gray-800 font-medium text-[13px]">
+                Name
+              </th>
+              <th className="py-3 px-4 text-gray-800 font-medium text-[13px]">
+                Status
+              </th>
+              <th className="py-3 px-4 text-gray-800 font-medium text-[13px]">
+                Priority
+              </th>
+              <th className="py-3 px-4 text-gray-800 font-medium text-[13px]">
+                Created On
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {tableData.map((task) => (
+              <tr key={task._id} className="border-t border-gray-200">
+                <td className="py-4 px-4 text-gray-700 text-[13px] line-clamp-1 overflow-hidden">
+                  {task.title}
+                </td>
+
+                <td className="py-4 px-4">
+                  <span
+                    className={`px-2 py-1 text-xs rounded inline-block ${getStatusBadgeColor(
+                      task.status
+                    )}`}
+                  >
+                    {task.status}
+                  </span>
+                </td>
+
+                <td className="py-4 px-4">
+                  <span
+                    className={`px-2 py-1 text-xs rounded inline-block ${getPriorityBadgeColor(
+                      task.priority
+                    )}`}
+                  >
+                    {task.priority}
+                  </span>
+                </td>
+
+                <td className="py-4 px-4 text-gray-700 text-[13px] text-nowrap">
+                  {task.createdAt
+                    ? moment(task.createdAt).format("Do MMM YYYY")
+                    : "N/A"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      
+      {/* Mobile Card View */}
+      <div className="md:hidden grid grid-cols-1 gap-3 mt-3">
+        {tableData.map((task) => (
+          <div key={task._id} className="border border-gray-200 rounded-lg p-4">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h3 className="font-medium text-gray-800 text-[13px] line-clamp-1">{task.title}</h3>
+                <div className="flex gap-2 mt-2">
+                  <span
+                    className={`px-2 py-1 text-xs rounded ${getStatusBadgeColor(
+                      task.status
+                    )}`}
+                  >
+                    {task.status}
+                  </span>
+                  <span
+                    className={`px-2 py-1 text-xs rounded ${getPriorityBadgeColor(
+                      task.priority
+                    )}`}
+                  >
+                    {task.priority}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 text-[13px] text-gray-700">
+              Created: {task.createdAt
+                ? moment(task.createdAt).format("Do MMM YYYY")
+                : "N/A"}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

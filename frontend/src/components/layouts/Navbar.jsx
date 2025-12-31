@@ -11,7 +11,7 @@ export default function Navbar({ activeMenu }) {
   return (
     <div className="flex gap-5 bg-white border border-b border-gray-200/50 backdrop-blur-[2px] py-4 px-7 sticky top-0 z-30">
       <button
-        className="clock lg:hidden text-black"
+        className="lg:hidden text-black"
         onClick={() => {
           setOpenSideMenu(!openSideMenu);
         }}
@@ -34,8 +34,10 @@ export default function Navbar({ activeMenu }) {
         <Notifications />
       </div>
       {openSideMenu && (
-        <div className="fixed top-[61px] -ml-4 bg-white">
-          <SideMenu activeMenu={activeMenu} />
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 lg:hidden" onClick={() => setOpenSideMenu(false)}>
+          <div className="absolute left-0 top-0 h-full w-64 bg-white shadow-xl z-50" onClick={(e) => e.stopPropagation()}>
+            <SideMenu activeMenu={activeMenu} />
+          </div>
         </div>
       )}
       <MessagingModal

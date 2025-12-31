@@ -89,7 +89,7 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mt-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mt-5">
           <InfoCard
             label="Total Tasks"
             value={addThousandSeparator(
@@ -124,41 +124,41 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4 md:my-6">
-        <div>
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <h5 className="font-medium">Task Distribution</h5>
-            </div>
+      <div className="grid grid-cols-1 gap-6 my-4 md:my-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <h5 className="font-medium">Task Distribution</h5>
+              </div>
 
-            <CustomPieChart
-              data={pieChartData}
-              // label='Total Balance'
-              colors={COLORS}
-            />
+              <CustomPieChart
+                data={pieChartData}
+                // label='Total Balance'
+                colors={COLORS}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <h5 className="font-medium">Task Priority Levels</h5>
+              </div>
+
+              <CustomBarChart data={barChartData} />
+            </div>
           </div>
         </div>
-
-        <div>
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <h5 className="font-medium">Task Priority Levels</h5>
-            </div>
-
-            <CustomBarChart data={barChartData} />
+        
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <h5 className="text-lg">Recent Tasks</h5>
+            <button className="card-btn" onClick={onSeeMore}>
+              See All <LuArrowRight className="text-base" />
+            </button>
           </div>
-        </div>
-
-        <div className="md:col-span-2">
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <h5 className="text-lg">Recent Tasks</h5>
-              <button className="card-btn" onClick={onSeeMore}>
-                See All <LuArrowRight className="text-base" />
-              </button>
-            </div>
-            <TaskListTable tableData={dashboardData?.recentTasks || []} />
-          </div>
+          <TaskListTable tableData={dashboardData?.recentTasks || []} />
         </div>
       </div>
     </DashboardLayout>

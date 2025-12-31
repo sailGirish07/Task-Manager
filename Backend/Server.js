@@ -7,11 +7,11 @@ const socketIo = require("socket.io");
 const connectDB = require("./config/db.js");
 
 const authRoutes = require("./routes/authRoutes.js");
-const userRoutes = require("./routes/userRoutes.js")
-const taskRoutes = require("./routes/taskRoutes.js")
-const reportRoutes = require("./routes/reportRoutes.js")
-const notificationRoutes = require("./routes/notificationRoutes.js")
-const messageRoutes = require("./routes/messageRoutes.js")
+const userRoutes = require("./routes/userRoutes.js");
+const taskRoutes = require("./routes/taskRoutes.js");
+const reportRoutes = require("./routes/reportRoutes.js");
+const notificationRoutes = require("./routes/notificationRoutes.js");
+const messageRoutes = require("./routes/messageRoutes.js");
 
 const app = express();
 const server = http.createServer(app);
@@ -33,11 +33,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 //Routes
 app.use("/api/auth", authRoutes);
-app.use('/api/users', userRoutes)
-app.use('/api/tasks', taskRoutes)
-app.use('/api/reports', reportRoutes)
-app.use('/api/notifications', notificationRoutes)
-app.use('/api/messages', messageRoutes)
+app.use('/api/users', userRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/messages', messageRoutes);
 
 //Socket.io setup
 const io = socketIo(server, {
@@ -69,6 +69,26 @@ io.on('connection', (socket) => {
     // Broadcast the message to the recipient if they're online
     if (data.recipientId && onlineUsers.has(data.recipientId)) {
       io.to(onlineUsers.get(data.recipientId)).emit('newMessage', data);
+    }
+  });
+  
+  // Handle typing indicators
+  socket.on('typing', (data) => {
+    if (data.recipientId && onlineUsers.has(data.recipientId)) {
+      io.to(onlineUsers.get(data.recipientId)).emit('typing', {
+        senderId: data.senderId,
+        isTyping: data.isTyping
+      });
+    }
+  });
+  
+  // Handle read receipts
+  socket.on('messageRead', (data) => {
+    if (data.senderId && onlineUsers.has(data.senderId)) {
+      io.to(onlineUsers.get(data.senderId)).emit('messageRead', {
+        recipientId: data.recipientId,
+        messageId: data.messageId
+      });
     }
   });
   
