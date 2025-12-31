@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
+const crypto = require("node:crypto");
 const { sendVerificationEmail } = require("../utils/emailService");
 
 //Generate Token
@@ -14,8 +14,38 @@ const registerUser = async (req, res) => {
     const { name, email, password, profileImageUrl, adminInviteToken } =
       req.body;
 
+    // Input validation
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Name, email, and password are required" });
+    }
+
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // Validate name length
+    if (typeof name !== "string" || name.trim().length < 2 || name.trim().length > 50) {
+      return res.status(400).json({ message: "Name must be between 2 and 50 characters" });
+    }
+
+    // Validate password strength
+    if (typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
+    }
+
+    // Validate optional fields
+    if (profileImageUrl && typeof profileImageUrl !== "string") {
+      return res.status(400).json({ message: "Profile image URL must be a string" });
+    }
+
+    if (adminInviteToken && typeof adminInviteToken !== "string") {
+      return res.status(400).json({ message: "Admin invite token must be a string" });
+    }
+
     // Check if user already exists
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email: email.trim().toLowerCase() });
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
     }
@@ -33,14 +63,12 @@ const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Generate verification code using crypto for better security
-    const verificationCode = crypto.randomInt(100000, 999999).toString();
-    const codeExpires = new Date(Date.now() + 30 * 1000); // 30 seconds
+    // No verification code needed at registration since user can login directly
 
     //create new user (unverified)
     const user = await User.create({
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password: hashedPassword,
       profileImageUrl,
       role,
@@ -60,7 +88,19 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    
+    // Input validation
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+    
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+    
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -119,6 +159,11 @@ const loginUser = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
+    // Validate user ID format
+    if (!req.user || !req.user.id) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+    
     const user = await User.findById(req.user.id).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
@@ -133,14 +178,50 @@ const updateUserProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    user.name = req.body.name || user.name;
-    user.email = req.body.email || user.email;
+    
+    // Update name if provided
+    if (req.body.name !== undefined) {
+      // Validate name
+      if (typeof req.body.name !== "string" || req.body.name.trim().length < 2 || req.body.name.trim().length > 50) {
+        return res.status(400).json({ message: "Name must be between 2 and 50 characters" });
+      }
+      user.name = req.body.name.trim();
+    }
+    
+    // Update email if provided
+    if (req.body.email !== undefined) {
+      // Validate email format
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(req.body.email)) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+      
+      // Check if email already exists for another user
+      const existingUser = await User.findOne({ 
+        email: req.body.email.trim().toLowerCase(), 
+        _id: { $ne: req.user.id } 
+      });
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already in use by another user" });
+      }
+      
+      user.email = req.body.email.trim().toLowerCase();
+    }
+    
     // Only update profileImageUrl if it's explicitly provided (including empty string to remove image)
     if (req.body.profileImageUrl !== undefined) {
+      if (req.body.profileImageUrl && typeof req.body.profileImageUrl !== "string") {
+        return res.status(400).json({ message: "Profile image URL must be a string" });
+      }
       user.profileImageUrl = req.body.profileImageUrl;
     }
 
     if (req.body.password) {
+      // Validate password strength
+      if (typeof req.body.password !== "string" || req.body.password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters long" });
+      }
+      
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(req.body.password, salt);
     }
@@ -165,9 +246,25 @@ const verifyCode = async (req, res) => {
   try {
     const { email, code } = req.body;
     
+    // Input validation
+    if (!email || !code) {
+      return res.status(400).json({ message: "Email and verification code are required" });
+    }
+    
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+    
+    // Validate code format (6-digit number)
+    if (!/^[0-9]{6}$/.test(code)) {
+      return res.status(400).json({ message: "Invalid verification code format" });
+    }
+    
     // Find user with this verification code
     const user = await User.findOne({ 
-      email: email,
+      email: email.trim().toLowerCase(),
       verificationCode: code,
       codeExpires: { $gt: Date.now() } // Check if code hasn't expired
     });
@@ -207,9 +304,20 @@ const verifyLoginCode = async (req, res) => {
       });
     }
     
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+    
+    // Validate code format (6-digit number)
+    if (!/^[0-9]{6}$/.test(code)) {
+      return res.status(400).json({ message: "Invalid verification code format" });
+    }
+    
     // Find user with this verification code
     const user = await User.findOne({ 
-      email: email,
+      email: email.trim().toLowerCase(),
       verificationCode: code,
       codeExpires: { $gt: Date.now() } // Check if code hasn't expired
     });
@@ -258,8 +366,19 @@ const resendVerificationEmail = async (req, res) => {
   try {
     const { email } = req.body;
     
+    // Input validation
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+    
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+    
     // Find user by email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
     
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -312,8 +431,14 @@ const forgotPassword = async (req, res) => {
       return res.status(400).json({ message: "Email is required" });
     }
     
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+    
     // Find user by email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
     
     if (!user) {
       // For security, don't reveal if user exists
@@ -367,45 +492,47 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ message: "Token, email, and new password are required" });
     }
     
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+    
     // Check password strength
-    if (newPassword.length < 8) {
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
       return res.status(400).json({ message: "Password must be at least 8 characters long" });
     }
     
-    try {
-      // Verify the reset token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Check if email matches
-      if (decoded.email !== email) {
-        return res.status(400).json({ message: "Invalid reset token" });
-      }
-      
-      // Find user by email
-      const user = await User.findOne({ email });
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Check if the new password is the same as the old password
-      const isSamePassword = await bcrypt.compare(newPassword, user.password);
-      if (isSamePassword) {
-        return res.status(400).json({ message: "This Password is already used. Change it" });
-      }
-      
-      // Hash new password
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(newPassword, salt);
-      
-      await user.save();
-      
-      res.status(200).json({ 
-        message: "Password has been reset successfully!" 
-      });
-    } catch (jwtError) {
-      return res.status(400).json({ message: "Invalid or expired reset token" });
+    // Verify the reset token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Check if email matches
+    if (decoded.email !== email) {
+      return res.status(400).json({ message: "Invalid reset token" });
     }
+    
+    // Find user by email
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Check if the new password is the same as the old password
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({ message: "This Password is already used. Change it" });
+    }
+    
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    
+    await user.save();
+    
+    res.status(200).json({ 
+      message: "Password has been reset successfully!" 
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -421,9 +548,20 @@ const verifyPasswordResetCode = async (req, res) => {
       return res.status(400).json({ message: "Email and code are required" });
     }
     
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+    
+    // Validate code format (6-digit number)
+    if (!/^[0-9]{6}$/.test(code)) {
+      return res.status(400).json({ message: "Invalid verification code format" });
+    }
+    
     // Create JWT token with email and code for verification
     const payload = {
-      email: email,
+      email: email.trim().toLowerCase(),
       code: code
     };
     
