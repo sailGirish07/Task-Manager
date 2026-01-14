@@ -9,15 +9,8 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Verify transporter configuration
-transporter.verify(function(error, success) {
-  if (error) {
-    console.warn('Email transporter warning: Email service may not be configured properly. Verification emails will not be sent.');
-    console.debug('Email transporter error details:', error);
-  } else {
-    console.log('Email transporter is ready');
-  }
-});
+// Transporter verification is skipped on startup to avoid blocking server initialization
+// It will be verified when sending the first email instead
 
 const sendVerificationEmail = async (email, code) => {
   try {

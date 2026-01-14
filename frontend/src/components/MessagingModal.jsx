@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext, useRef } from "react";
 import axiosInstance from "../utils/axiosInstance";
-import { API_PATHS } from "../utils/apiPaths";
+import { API_PATHS, BASE_URL } from "../utils/apiPaths";
 import { UserContext } from "../context/UserContext";
 import { socket } from "./utils/socket";
 
@@ -47,6 +47,8 @@ const MessagingModal = ({ isOpen, onClose }) => {
           clearTimeout(typingTimeoutRef.current[key]);
         }
       });
+      // Clear all typing indicators
+      setTypingUsers({});
     };
   }, []);
   // Fetch initial data
@@ -513,7 +515,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
       setFileName(file.name);
       setIsUploading(true);
       setUploadProgress(0); // Reset progress
-      sendMessage(file); // Send the file immediately
+      // Don't send immediately - let user click send button
     }
   };
   
@@ -1061,7 +1063,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                       msg.fileType?.startsWith('image/') ? (
                                         // Image file - show directly
                                         <img
-                                          src={`${window.location.origin.replace(/:\d+$/, ':8000')}${msg.fileUrl}`}
+                                          src={`${BASE_URL}${msg.fileUrl}`}
                                           alt={msg.fileName}
                                           className="max-w-[120px] max-h-32 rounded-lg object-cover"
                                           onError={(e) => {
@@ -1072,7 +1074,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                       ) : (
                                         // Non-image file - show as attachment
                                         <a 
-                                          href={`${window.location.origin.replace(/:\d+$/, ':8000')}${msg.fileUrl}`}
+                                          href={`${BASE_URL}${msg.fileUrl}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="flex flex-col gap-1"
@@ -1272,7 +1274,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                       onKeyPress={handleKeyPress}
                     />
                     <button
-                      onClick={() => sendMessage()}
+                      onClick={() => sendMessage(selectedFile)}
                       disabled={!newMessage.trim() && !selectedFile}
                       className="p-3.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >

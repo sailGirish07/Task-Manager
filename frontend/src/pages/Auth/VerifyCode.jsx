@@ -6,11 +6,12 @@ import AuthLayout from "../../components/layouts/AuthLayout";
 
 export default function VerifyCode() {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
+  const [isExpired, setIsExpired] = useState(false);
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [countdown, setCountdown] = useState(30); // 30 seconds
+  const [countdown, setCountdown] = useState(60); // 60 seconds
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,7 +30,16 @@ export default function VerifyCode() {
 
   // Countdown timer
   useEffect(() => {
-    if (countdown <= 0) return;
+    if (countdown <= 0) {
+      setError("Verification code has expired. Please request a new code.");
+      setIsExpired(true); // Mark as expired
+      // Focus first input when countdown expires
+      setTimeout(() => {
+        const firstInput = document.getElementById("code-0");
+        if (firstInput) firstInput.focus();
+      }, 100);
+      return; // Don't start timer when countdown is 0 or below
+    }
 
     const timer = setInterval(() => {
       setCountdown(prev => prev - 1);
@@ -42,7 +52,7 @@ export default function VerifyCode() {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
   // Handle input change
@@ -109,9 +119,14 @@ export default function VerifyCode() {
       }
     } catch (err) {
       if (err.response && err.response.data.message) {
-        setError(err.response.data.message);
+        // Check if the error is specifically for expired code
+        if (err.response.data.errorType === "CODE_EXPIRED") {
+          setError("Verification code has expired");
+        } else {
+          setError(err.response.data.message);
+        }
       } else {
-        setError("Something went wrong. Please try again.");
+        setError("Invalid or expired verification code.");
       }
       
       // Clear the code inputs
@@ -123,6 +138,8 @@ export default function VerifyCode() {
       }, 100);
     } finally {
       setIsLoading(false);
+      // Clear error after 3 seconds
+      setTimeout(() => setError(""), 3000);
     }
   };
 
@@ -131,6 +148,7 @@ export default function VerifyCode() {
     setIsLoading(true);
     setError("");
     setMessage("");
+    setIsExpired(false); // Reset expired state
 
     try {
       const response = await axiosInstance.post(API_PATHS.AUTH.RESEND_CODE, {
@@ -139,7 +157,7 @@ export default function VerifyCode() {
 
       setMessage(response.data.message);
       // Reset countdown
-      setCountdown(30);
+      setCountdown(60);
       // Clear code inputs
       setCode(["", "", "", "", "", ""]);
       
@@ -156,6 +174,8 @@ export default function VerifyCode() {
       }
     } finally {
       setIsLoading(false);
+      // Clear error after 3 seconds
+      setTimeout(() => setError(""), 3000);
     }
   };
 
@@ -165,7 +185,7 @@ export default function VerifyCode() {
         <h3 className="text-xl font-semibold text-black">Verify Your Email</h3>
         
         <p className="text-xs text-slate-700 mt-[5px] mb-6">
-          We sent a 6-digit code to <strong>{email}</strong>. This code will expire in 30 seconds.
+          We sent a 6-digit code to <strong>{email}</strong>. This code will expire in 60 seconds.
         </p>
 
         <div className="mb-6">
@@ -183,8 +203,8 @@ export default function VerifyCode() {
                 value={digit}
                 onChange={(e) => handleInputChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
-                className="w-12 h-12 text-2xl text-center border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                disabled={isLoading}
+                className={`w-12 h-12 text-2xl text-center border-2 rounded-lg focus:outline-none ${isExpired ? 'border-red-500 bg-gray-100 text-gray-400' : 'border-gray-300'} focus:border-blue-500`}
+                disabled={isLoading || isExpired}
               />
             ))}
           </div>
@@ -201,8 +221,8 @@ export default function VerifyCode() {
 
           <button
             onClick={() => handleSubmit(code.join(""))}
-            disabled={isLoading || code.some(digit => digit === "")}
-            className={`w-full btn-primary ${isLoading || code.some(digit => digit === "") ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={isLoading || code.some(digit => digit === "") || isExpired}
+            className={`w-full btn-primary ${isLoading || code.some(digit => digit === "") || isExpired ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {isLoading ? "Verifying..." : "Verify Code"}
           </button>

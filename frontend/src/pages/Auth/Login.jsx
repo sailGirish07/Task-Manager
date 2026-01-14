@@ -80,14 +80,15 @@ export default function Login() {
         password,
       });
 
-      const { token, role } = response.data;
+      const { accessToken, refreshToken, role } = response.data;
 
-      if (token) {
+      if (accessToken && refreshToken) {
         // Clear the original processing message timeout and update message
         clearTimeout(successTimeout);
         setSuccessMessage("Login successful! Redirecting...");
         
-        localStorage.setItem("token", token);
+        localStorage.setItem("accessToken", accessToken);
+        localStorage.setItem("refreshToken", refreshToken);
         updateUser(response.data);
 
         // Redirect after showing the success message for 3 seconds

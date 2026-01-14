@@ -110,15 +110,13 @@ const getTasks = async (req, res) => {
       );
     }
 
-    //Add completed todoChecklist count to each task
-    tasks = await Promise.all(
-      tasks.map(async (task) => {
-        const completedCount = task.todoChecklist.filter(
-          (item) => item.completed
-        ).length;
-        return { ...task._doc, completedTodoCount: completedCount };
-      })
-    );
+    // Add completed todoChecklist count to each task
+    tasks = tasks.map(task => {
+      const completedCount = task.todoChecklist.filter(
+        (item) => item.completed
+      ).length;
+      return { ...task._doc, completedTodoCount: completedCount };
+    });
 
     // Get accurate counts across all statuses using countDocuments for efficiency
     let baseFilter = {};
@@ -126,10 +124,18 @@ const getTasks = async (req, res) => {
       baseFilter = { assignedTo: req.user._id };
     }
     
-    const allTasksCount = await Task.countDocuments(baseFilter);
-    const pendingTasksCount = await Task.countDocuments({ ...baseFilter, status: "Pending" });
-    const inProgressTasksCount = await Task.countDocuments({ ...baseFilter, status: "In Progress" });
-    const completedTasksCount = await Task.countDocuments({ ...baseFilter, status: "Completed" });
+    // Use Promise.all to execute all count queries concurrently
+    const [
+      allTasksCount,
+      pendingTasksCount,
+      inProgressTasksCount,
+      completedTasksCount
+    ] = await Promise.all([
+      Task.countDocuments(baseFilter),
+      Task.countDocuments({ ...baseFilter, status: "Pending" }),
+      Task.countDocuments({ ...baseFilter, status: "In Progress" }),
+      Task.countDocuments({ ...baseFilter, status: "Completed" })
+    ]);
     
     //Status summary counts - calculate from database counts, not filtered tasks
     const statusSummary = {

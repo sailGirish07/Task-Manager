@@ -37,10 +37,10 @@ const UserSchema = new mongoose.Schema(
     codeExpires: {
       type: Date,
     },
-    resetPasswordToken: {
+    resetPasswordCode: {
       type: String,
     },
-    resetPasswordExpires: {
+    resetCodeExpires: {
       type: Date,
     },
     lastActive: {

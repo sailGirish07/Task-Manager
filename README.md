@@ -261,7 +261,7 @@ The messaging system works as follows:
 - `Socket.IO`: Real-time communication implementation
 
 **Key Features**:
-- Direct messaging only (no group chats)
+- Direct messaging between users (no group chats)
 - Message persistence in MongoDB
 - Real-time delivery via WebSocket
 - Online status tracking with last active timestamps

@@ -4,7 +4,17 @@ const jwt = require("jsonwebtoken");
 const crypto = require("node:crypto");
 const { sendVerificationEmail } = require("../utils/emailService");
 
-//Generate Token
+// Generate Access Token (short-lived)
+const generateAccessToken = (userId) => {
+  return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "15m" });
+};
+
+// Generate Refresh Token (long-lived)
+const generateRefreshToken = (userId) => {
+  return jwt.sign({ id: userId, type: "refresh" }, process.env.JWT_SECRET, { expiresIn: "7d" });
+};
+
+// Generate legacy token for backward compatibility
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
 };
@@ -113,8 +123,9 @@ const loginUser = async (req, res) => {
     
     // Check if user is already verified
     if (user.verified) {
-      // User already verified - generate token and login
-      const token = generateToken(user._id);
+      // User already verified - generate tokens and login
+      const accessToken = generateAccessToken(user._id);
+      const refreshToken = generateRefreshToken(user._id);
       
       res.json({
         _id: user._id,
@@ -122,31 +133,33 @@ const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         profileImageUrl: user.profileImageUrl,
-        token: token,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
       });
       return;
     }
     
     // User not verified - send verification code
     const verificationCode = crypto.randomInt(100000, 999999).toString();
-    const codeExpires = new Date(Date.now() + 30 * 1000); // 30 seconds
+    const codeExpires = new Date(Date.now() + 1 * 60 * 1000); // 1 minute
     
     // Save code to user
     user.verificationCode = verificationCode;
     user.codeExpires = codeExpires;
     await user.save();
     
-    // Send verification email with code
-    const emailResult = await sendVerificationEmail(email, verificationCode);
-    
-    if (!emailResult.success) {
-      console.error('Failed to send verification email:', emailResult.error);
-      return res.status(500).json({ 
-        message: "Failed to send verification code. Please try again." 
+    // Send verification email with code in the background
+    sendVerificationEmail(email, verificationCode)
+      .then(emailResult => {
+        if (!emailResult.success) {
+          console.error('Failed to send verification email:', emailResult.error);
+        }
+      })
+      .catch(emailError => {
+        console.error('Error sending verification email:', emailError);
       });
-    }
     
-    // Return response indicating verification needed
+    // Return response immediately without waiting for email
     res.status(200).json({
       message: "Verification code sent to your email. Please verify to continue.",
       verificationRequired: true,
@@ -262,16 +275,31 @@ const verifyCode = async (req, res) => {
       return res.status(400).json({ message: "Invalid verification code format" });
     }
     
-    // Find user with this verification code
-    const user = await User.findOne({ 
+    // ✅ STEP 1: Find user by email ONLY
+    const user = await User.findOne({
       email: email.trim().toLowerCase(),
-      verificationCode: code,
-      codeExpires: { $gt: Date.now() } // Check if code hasn't expired
     });
-    
-    if (!user) {
-      return res.status(400).json({ 
-        message: "Invalid or expired verification code" 
+
+    if (!user || !user.verificationCode) {
+      return res.status(400).json({
+        errorType: "INVALID_CODE",
+        message: "Invalid verification code",
+      });
+    }
+
+    // ✅ STEP 2: Check expiration
+    if (user.codeExpires < Date.now()) {
+      return res.status(400).json({
+        errorType: "CODE_EXPIRED",
+        message: "Verification code has expired",
+      });
+    }
+
+    // ✅ STEP 3: Check code match
+    if (user.verificationCode !== code) {
+      return res.status(400).json({
+        errorType: "INVALID_CODE",
+        message: "Invalid verification code",
       });
     }
     
@@ -315,23 +343,31 @@ const verifyLoginCode = async (req, res) => {
       return res.status(400).json({ message: "Invalid verification code format" });
     }
     
-    // Find user with this verification code
-    const user = await User.findOne({ 
+    // ✅ STEP 1: Find user by email ONLY
+    const user = await User.findOne({
       email: email.trim().toLowerCase(),
-      verificationCode: code,
-      codeExpires: { $gt: Date.now() } // Check if code hasn't expired
     });
-    
-    if (!user) {
-      return res.status(400).json({ 
-        message: "Invalid or expired verification code" 
+
+    if (!user || !user.verificationCode) {
+      return res.status(400).json({
+        errorType: "INVALID_CODE",
+        message: "Invalid verification code",
       });
     }
-    
-    // Check if code has expired
+
+    // ✅ STEP 2: Check expiration
     if (user.codeExpires < Date.now()) {
-      return res.status(400).json({ 
-        message: "Verification code has expired" 
+      return res.status(400).json({
+        errorType: "CODE_EXPIRED",
+        message: "Verification code has expired",
+      });
+    }
+
+    // ✅ STEP 3: Check code match
+    if (user.verificationCode !== code) {
+      return res.status(400).json({
+        errorType: "INVALID_CODE",
+        message: "Invalid verification code",
       });
     }
     
@@ -343,8 +379,9 @@ const verifyLoginCode = async (req, res) => {
     
     await user.save();
     
-    // Generate token for authenticated user
-    const token = generateToken(user._id);
+    // Generate tokens for authenticated user
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
     
     res.json({
       success: true,
@@ -354,7 +391,8 @@ const verifyLoginCode = async (req, res) => {
       email: user.email,
       role: user.role,
       profileImageUrl: user.profileImageUrl,
-      token: token,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -393,7 +431,7 @@ const resendVerificationEmail = async (req, res) => {
     
     // Generate new verification code
     const verificationCode = crypto.randomInt(100000, 999999).toString();
-    const codeExpires = new Date(Date.now() + 30 * 1000); // 30 seconds
+    const codeExpires = new Date(Date.now() + 1 * 60 * 1000); // 1 minute
     
     // Reset verification status and update code
     user.verified = false;
@@ -403,15 +441,16 @@ const resendVerificationEmail = async (req, res) => {
     
     await user.save();
     
-    // Send verification email with code
-    const emailResult = await sendVerificationEmail(email, verificationCode);
-    
-    if (!emailResult.success) {
-      console.error('Failed to send verification email:', emailResult.error);
-      return res.status(500).json({ 
-        message: "Failed to send verification email" 
+    // Send verification email with code in the background
+    sendVerificationEmail(email, verificationCode)
+      .then(emailResult => {
+        if (!emailResult.success) {
+          console.error('Failed to send verification email:', emailResult.error);
+        }
+      })
+      .catch(emailError => {
+        console.error('Error sending verification email:', emailError);
       });
-    }
     
     res.status(200).json({
       message: "Verification code sent successfully!"
@@ -449,34 +488,34 @@ const forgotPassword = async (req, res) => {
     
     // Generate 6-digit verification code
     const verificationCode = crypto.randomInt(100000, 999999).toString();
+    const codeExpires = new Date(Date.now() + 1 * 60 * 1000); // 1 minute
     
-    // Create JWT token with email and code (60 seconds expiry)
-    const payload = {
-      email: user.email,
-      code: verificationCode
-    };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "60s" });
+    // Store the hashed verification code and expiration in the user document
+    user.resetPasswordCode = verificationCode; // Store plain code temporarily
+    user.resetCodeExpires = codeExpires;
+    await user.save();
     
-    // Send verification code email
-    try {
-      await sendVerificationEmail(
-        user.email, 
-        `Password Reset Code: ${verificationCode}`,
-        `<p>You requested a password reset. Your verification code is:</p>
-         <h2 style="font-size: 24px; font-weight: bold;">${verificationCode}</h2>
-         <p>This code will expire in 60 seconds.</p>
-         <p>If you didn't request this, please ignore this email.</p>`
-      );
-      
-      res.status(200).json({ 
-        message: "Password reset code sent to your email." 
+    // Send verification code email in the background
+    sendVerificationEmail(
+      user.email, 
+      `Password Reset Code: ${verificationCode}`,
+      `<p>You requested a password reset. Your verification code is:</p>
+       <h2 style="font-size: 24px; font-weight: bold;">${verificationCode}</h2>
+       <p>This code will expire in 60 seconds.</p>
+       <p>If you didn't request this, please ignore this email.</p>`
+    )
+      .then(emailResult => {
+        if (!emailResult.success) {
+          console.error('Failed to send password reset email:', emailResult.error);
+        }
+      })
+      .catch(emailError => {
+        console.error('Error sending password reset email:', emailError);
       });
-    } catch (emailError) {
-      console.error('Failed to send password reset email:', emailError);
-      return res.status(500).json({ 
-        message: "Failed to send password reset code. Please try again." 
-      });
-    }
+    
+    res.status(200).json({ 
+      message: "Password reset code sent to your email." 
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -528,6 +567,10 @@ const resetPassword = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
     
+    // Clear the reset password code and expiration
+    user.resetPasswordCode = undefined;
+    user.resetCodeExpires = undefined;
+    
     await user.save();
     
     res.status(200).json({ 
@@ -539,59 +582,169 @@ const resetPassword = async (req, res) => {
 };
 
 // Verify Password Reset Code - Validate 6-digit code and generate reset token
+// const verifyPasswordResetCode = async (req, res) => {
+//   try {
+//     const { email, code } = req.body;
+    
+//     // Validate input
+//     if (!email || !code) {
+//       return res.status(400).json({ message: "Email and code are required" });
+//     }
+    
+//     // Validate email format
+//     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({ message: "Invalid email format" });
+//     }
+    
+//     // Validate code format (6-digit number)
+//     if (!/^[0-9]{6}$/.test(code)) {
+//       return res.status(400).json({ message: "Invalid verification code format" });
+//     }
+    
+//     // Find user with the verification code and check if it hasn't expired
+//     const user = await User.findOne({ 
+//       email: email.trim().toLowerCase(),
+//       resetPasswordCode: code,
+//       resetCodeExpires: { $gt: Date.now() } // Check if code hasn't expired
+//     });
+    
+//     if (!user) {
+//       return res.status(400).json({ 
+//         message: "Invalid or expired verification code" 
+//       });
+//     }
+    
+//     // Check if code has expired
+//     if (user.resetCodeExpires < Date.now()) {
+//       return res.status(400).json({ 
+//         message: "Verification code has expired" 
+//       });
+//     }
+    
+//     // If valid, generate reset token with 60s (1 min) expiry
+//     const resetPayload = {
+//       email: email
+//     };
+//     const resetToken = jwt.sign(resetPayload, process.env.JWT_SECRET, { expiresIn: "60s" });
+    
+//     // Clear the reset password code after successful verification
+//     user.resetPasswordCode = undefined;
+//     user.resetCodeExpires = undefined;
+//     await user.save();
+    
+//     res.status(200).json({ 
+//       success: true,
+//       message: "Code verified successfully!",
+//       resetToken: resetToken
+//     });
+//   } catch (error) {
+//     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+//       return res.status(400).json({ message: "Invalid or expired verification code" });
+//     }
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
 const verifyPasswordResetCode = async (req, res) => {
   try {
     const { email, code } = req.body;
-    
-    // Validate input
+
     if (!email || !code) {
       return res.status(400).json({ message: "Email and code are required" });
     }
-    
-    // Validate email format
+
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format" });
     }
-    
-    // Validate code format (6-digit number)
+
     if (!/^[0-9]{6}$/.test(code)) {
       return res.status(400).json({ message: "Invalid verification code format" });
     }
-    
-    // Create JWT token with email and code for verification
-    const payload = {
+
+    // ✅ STEP 1: Find user by email ONLY
+    const user = await User.findOne({
       email: email.trim().toLowerCase(),
-      code: code
-    };
-    
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "60s" });
-    
-    // Verify the JWT token (this will throw if expired or invalid)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Check if code and email match
-    if (decoded.code !== code || decoded.email !== email) {
-      return res.status(400).json({ message: "Invalid verification code" });
+    });
+
+    if (!user || !user.resetPasswordCode) {
+      return res.status(400).json({
+        errorType: "INVALID_CODE",
+        message: "Invalid verification code",
+      });
     }
-    
-    // If valid, generate reset token with 300s (5 min) expiry
-    const resetPayload = {
-      email: email
-    };
-    const resetToken = jwt.sign(resetPayload, process.env.JWT_SECRET, { expiresIn: "300s" });
-    
-    res.status(200).json({ 
+
+    // ✅ STEP 2: Check expiration
+    if (user.resetCodeExpires < Date.now()) {
+      return res.status(400).json({
+        errorType: "CODE_EXPIRED",
+        message: "Verification code has expired",
+      });
+    }
+
+    // ✅ STEP 3: Check code match
+    if (user.resetPasswordCode !== code) {
+      return res.status(400).json({
+        errorType: "INVALID_CODE",
+        message: "Invalid verification code",
+      });
+    }
+
+    // ✅ SUCCESS
+    const resetToken = jwt.sign(
+      { email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "60s" }
+    );
+
+    user.resetPasswordCode = undefined;
+    user.resetCodeExpires = undefined;
+    await user.save();
+
+    res.status(200).json({
       success: true,
       message: "Code verified successfully!",
-      resetToken: resetToken
+      resetToken,
     });
   } catch (error) {
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(400).json({ message: "Invalid or expired verification code" });
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
+// Refresh Access Token
+const refreshAccessToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(400).json({ message: "Refresh token is required" });
+    }
+    
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    
+    // Check if it's actually a refresh token
+    if (decoded.type !== "refresh") {
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+    
+    // Generate new access token
+    const newAccessToken = generateAccessToken(decoded.id);
+    
+    res.json({
+      accessToken: newAccessToken
+    });
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Refresh token expired" });
+    }
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ message: "Invalid refresh token" });
     }
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, verifyCode, resendVerificationEmail, verifyLoginCode, forgotPassword, resetPassword, verifyPasswordResetCode };
+module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, verifyCode, resendVerificationEmail, verifyLoginCode, forgotPassword, resetPassword, verifyPasswordResetCode, refreshAccessToken };
