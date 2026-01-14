@@ -21,13 +21,59 @@ A full-stack task management application built with the MERN stack (MongoDB, Exp
 
 ## Features
 
-- User authentication (login/signup)
+- **Enhanced User Authentication** (login/signup with JWT refresh token rotation)
 - Role-based access control (Admin/User)
 - Create, read, update, and delete tasks
 - Assign tasks to users
 - Task status tracking
 - User management (Admin only)
 - Reporting and analytics
+- **Secure Email Verification** with 1-minute code expiration
+- **Forgot Password** flow with secure code validation
+
+## Security Features
+
+### JWT Refresh Token Rotation
+The application implements industry-standard JWT security with refresh token rotation:
+
+**Implementation Details**:
+- **Access Tokens**: Short-lived (15 minutes) for enhanced security
+- **Refresh Tokens**: Long-lived (7 days) for seamless user experience
+- **Automatic Rotation**: New access tokens issued when old ones expire
+- **Token Invalidation**: Old tokens immediately invalidated upon refresh
+- **Seamless Experience**: Users continue working without re-authentication
+
+**Backend Implementation**:
+- `generateAccessToken()`: Creates 15-minute access tokens
+- `generateRefreshToken()`: Creates 7-day refresh tokens
+- `/refresh-token` endpoint: Handles token renewal requests
+- Enhanced auth middleware: Proper token expiration handling
+
+**Frontend Implementation**:
+- Axios interceptors automatically handle token refresh
+- LocalStorage management for both token types
+- Graceful degradation when refresh fails
+
+### Email Verification System
+Enhanced security for user authentication:
+
+**Key Features**:
+- **6-digit verification codes** sent via email
+- **1-minute expiration time** for security
+- **Auto-expiration handling** with clear UI feedback
+- **Consistent error messaging** across verification flows
+- **Input state management** when codes expire
+
+**Verification Flows**:
+1. **Email Registration**: New users verify email before account activation
+2. **Login Verification**: Unverified users receive codes during login
+3. **Password Reset**: Users verify identity before password change
+
+**Security Measures**:
+- Server-side validation of all verification codes
+- Proper error handling with `errorType` differentiation
+- Input sanitization to prevent injection attacks
+- Rate limiting protection (planned enhancement)
 
 ## Messaging System
 
@@ -59,6 +105,41 @@ The messaging system follows a clear workflow:
 10. **Message Deletion**: Users can delete their own messages with soft deletion
 
 ## Technologies Used
+
+### Frontend
+- React 18 with Hooks and Context API
+- React Router v7 for navigation
+- Tailwind CSS for responsive styling
+- Axios for HTTP requests with interceptors
+- JWT for secure authentication
+- Recharts for data visualization
+- React Icons for UI components
+- Moment.js for date/time handling
+
+### Backend
+- Node.js with Express.js v5
+- MongoDB with Mongoose ODM
+- JWT with refresh token rotation
+- Bcrypt.js for password hashing
+- Crypto for secure code generation
+- Multer for file uploads
+- Cors for cross-origin resource sharing
+- JSON Web Tokens for stateless authentication
+
+### Security Features
+- JWT refresh token rotation mechanism
+- Server-side input validation and sanitization
+- Rate limiting (planned)
+- CSRF protection (planned)
+- Secure password reset flow
+- Email verification with expiration
+
+### Planned Security Enhancements
+- **Rate Limiting**: Implementation of rate limiting middleware for auth endpoints
+- **CSRF Protection**: Anti-CSRF tokens for all form submissions
+- **Enhanced Logging**: Structured error logging and security event monitoring
+- **Input Sanitization**: Comprehensive sanitization for all user inputs
+- **Advanced Validation**: Enhanced server-side validation rules
 
 ## Task Management System
 
@@ -126,6 +207,43 @@ The task management system works as follows:
 
 The Task Manager application is a comprehensive solution that combines task management with real-time communication features. The system allows administrators to create and assign tasks while users can collaborate through direct messaging.
 
+## Authentication Flow
+
+The application implements a robust, multi-layered authentication system:
+
+### 1. User Registration
+- New users provide email, name, and password
+- Account created in unverified state
+- 6-digit verification code sent via email
+- Code expires in 1 minute for security
+- Users must verify email before full access
+
+### 2. Login Process
+- Email and password validation
+- For unverified users: Verification code sent
+- For verified users: JWT tokens generated
+- Access token (15 min) + Refresh token (7 days)
+
+### 3. Session Management
+- Automatic token refresh when access token expires
+- Seamless user experience without re-authentication
+- Proper logout with token cleanup
+- Session timeout handling
+
+### 4. Password Reset Flow
+- Users request password reset via email
+- 6-digit code sent with 1-minute expiration
+- Code verification with error type handling
+- Secure password update with validation
+
+### Security Implementation
+- **Server-side validation** for all inputs
+- **JWT refresh token rotation** for session security
+- **Input sanitization** to prevent injection attacks
+- **Consistent error handling** with proper error types
+- **Rate limiting protection** (planned enhancement)
+- **CSRF protection** (planned enhancement)
+
 ## Project Working Flow
 
 The complete project workflow includes:
@@ -151,17 +269,23 @@ The application functions as a full-stack system with:
 - Context API for state management
 - Tailwind CSS for responsive styling
 - Real-time updates via Socket.IO
-- Form handling and validation
+- **Enhanced form handling** with proper validation
 - Routing with React Router
+- **JWT token management** with automatic refresh
+- **Axios interceptors** for seamless authentication
+- **Consistent UI components** for verification flows
 
 **Backend Architecture**:
 - Express.js REST API with proper middleware
 - MongoDB database with Mongoose ODM
-- JWT-based authentication and authorization
+- **JWT refresh token rotation** for enhanced security
 - File upload handling with Multer
 - Real-time communication with Socket.IO
 - Comprehensive error handling
-- Input validation and sanitization
+- **Server-side input validation and sanitization**
+- **Enhanced authentication controllers** with 3-step validation
+- **Secure code generation** using crypto module
+- **Consistent error type handling** across endpoints
 
 **Integration Points**:
 - Authentication middleware protecting routes
