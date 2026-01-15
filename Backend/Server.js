@@ -1,4 +1,8 @@
-require("dotenv").config();
+// Load environment variables
+if (process.env.NODE_ENV !== 'production') {
+  require("dotenv").config();
+}
+// In production, Vercel automatically injects environment variables
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
