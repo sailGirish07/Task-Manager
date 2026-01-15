@@ -52,13 +52,11 @@ const io = socketIo(server, {
 const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
-  // console.log('A user connected:', socket.id);
   
   // User joins with their ID when they connect
   socket.on('join', (userId) => {
     onlineUsers.set(userId, socket.id);
     socket.join(userId);
-    // console.log(`User ${userId} joined with socket ID ${socket.id}`);
     
     // Update online status in database
     // This would require importing User model and updating lastActive
@@ -100,7 +98,6 @@ io.on('connection', (socket) => {
   
   // Handle disconnect
   socket.on('disconnect', () => {
-    // console.log('A user disconnected:', socket.id);
     // Remove user from online users map
     for (let [userId, socketId] of onlineUsers) {
       if (socketId === socket.id) {

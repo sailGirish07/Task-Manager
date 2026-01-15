@@ -47,10 +47,10 @@ const sendVerificationEmail = async (email, code) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('Verification email sent: ' + info.response);
+    // Log email sending in production environment if needed
     return { success: true };
   } catch (error) {
-    console.error('Error sending verification email:', error);
+    console.error('Error sending verification email:', error.message || error);
     return { success: false, error: error.message };
   }
 };
@@ -86,10 +86,10 @@ const sendPasswordResetEmail = async (email, token) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('Password reset email sent: ' + info.response);
+    // Log email sending in production environment if needed
     return { success: true };
   } catch (error) {
-    console.error('Error sending password reset email:', error);
+    console.error('Error sending password reset email:', error.message || error);
     return { success: false, error: error.message };
   }
 };

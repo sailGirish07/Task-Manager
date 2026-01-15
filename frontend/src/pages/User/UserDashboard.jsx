@@ -58,7 +58,7 @@ export default function UserDashboard() {
         prepareChartData(response.data?.charts || null);
       }
     } catch (err) {
-      console.log("Error fetching users:", err);
+      console.error("Error fetching dashboard data:", err);
     }
   };
 
