@@ -1,13 +1,20 @@
 // Load environment variables
-if (process.env.NODE_ENV !== 'production') {
-  require("dotenv").config();
-}
-// In production, Vercel automatically injects environment variables
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const http = require("http");
-// // const socketIo = require("socket.io"); // Disabled for Vercel deployment // Disabled for Vercel deployment
+
+// Check if we're running in a serverless environment
+const isServerless = process.env.SERVERLESS === 'true';
+
+let http;
+let server;
+
+if (!isServerless) {
+  http = require("http");
+  server = http.createServer();
+}
+
 const connectDB = require("./config/db.js");
 
 const authRoutes = require("./routes/authRoutes.js");
@@ -18,8 +25,8 @@ const notificationRoutes = require("./routes/notificationRoutes.js");
 const messageRoutes = require("./routes/messageRoutes.js");
 
 const app = express();
-const server = http.createServer(app);
 
+// Apply middleware to the app
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "*",
@@ -40,11 +47,6 @@ app.get('/favicon.ico', (req, res) => {
   res.status(204); // No content
 });
 
-// Handle favicon requests to prevent 404 errors
-app.get('/favicon.ico', (req, res) => {
-  res.status(204); // No content
-});
-
 //Routes
 app.use("/api/auth", authRoutes);
 app.use('/api/users', userRoutes);
@@ -53,36 +55,24 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/messages', messageRoutes);
 
-// Catch-all route for undefined endpoints (after API routes)
-app.use('*', (req, res) => {
-  res.status(404).json({ message: 'Endpoint not found' });
+// Error handling middleware - place this after routes
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found' });
 });
 
-// Socket.io disabled for Vercel deployment
-// const io = socketIo(server, {
-//   cors: {
-//     origin: process.env.CLIENT_URL || "http://localhost:5173",
-//     methods: ["GET", "POST"],
-//     credentials: true
-//   }
-// });
+// Export the app instance for Vercel
+module.exports = app;
 
-// Track online users (mock for compatibility)
-// const onlineUsers = new Map();
+// Export io for compatibility but set to null in serverless
+module.exports.io = null;
 
-// io.on('connection', (socket) => {
-//   // All Socket.io handlers disabled for Vercel
-// });
+// Only start the server if not in serverless environment
+if (!isServerless) {
+  const PORT = process.env.PORT || 5000;
+  server.on('request', app);
+  server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
 
-const io = null; // Mock io for compatibility
-
-// Export mock io instance for controllers
-module.exports.io = io;
-
-// Skip Socket.io setup for Vercel deployment
+// For serverless environments, set io to null
 // const messageController = require('./controllers/messageController');
-// messageController.setIo(io);
-
-//Server
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// messageController.setIo(null);
