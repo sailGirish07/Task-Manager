@@ -54,8 +54,8 @@ app.use(/^\/api\/.*/, (req, res) => {
 // Export the app instance for Vercel
 module.exports = app;
 
-// Only start the server if not in serverless environment
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+// Only start server locally
+if (!process.env.VERCEL_ENV) {
   const server = http.createServer(app);
   const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
