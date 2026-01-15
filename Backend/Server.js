@@ -7,7 +7,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const http = require("http");
-const socketIo = require("socket.io");
+// // const socketIo = require("socket.io"); // Disabled for Vercel deployment // Disabled for Vercel deployment
 const connectDB = require("./config/db.js");
 
 const authRoutes = require("./routes/authRoutes.js");
@@ -40,9 +40,9 @@ app.get('/favicon.ico', (req, res) => {
   res.status(204); // No content
 });
 
-// Catch-all route for undefined endpoints
-app.use('*', (req, res) => {
-  res.status(404).json({ message: 'Endpoint not found' });
+// Handle favicon requests to prevent 404 errors
+app.get('/favicon.ico', (req, res) => {
+  res.status(204); // No content
 });
 
 //Routes
@@ -58,81 +58,30 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Endpoint not found' });
 });
 
-//Socket.io setup
-const io = socketIo(server, {
-  cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
-    methods: ["GET", "POST"],
-    credentials: true
-  }
-});
+// Socket.io disabled for Vercel deployment
+// const io = socketIo(server, {
+//   cors: {
+//     origin: process.env.CLIENT_URL || "http://localhost:5173",
+//     methods: ["GET", "POST"],
+//     credentials: true
+//   }
+// });
 
-// Track online users
-const onlineUsers = new Map();
+// Track online users (mock for compatibility)
+// const onlineUsers = new Map();
 
-io.on('connection', (socket) => {
-  
-  // User joins with their ID when they connect
-  socket.on('join', (userId) => {
-    onlineUsers.set(userId, socket.id);
-    socket.join(userId);
-    
-    // Update online status in database
-    // This would require importing User model and updating lastActive
-  });
-  
-  // Handle new messages
-  socket.on('newMessage', (data) => {
-    // Broadcast the message to the recipient if they're online
-    if (data.recipientId && onlineUsers.has(data.recipientId)) {
-      io.to(onlineUsers.get(data.recipientId)).emit('newMessage', data);
-    }
-  });
-  
-  // Handle typing indicators
-  socket.on('typing', (data) => {
-    if (data.recipientId && onlineUsers.has(data.recipientId)) {
-      io.to(onlineUsers.get(data.recipientId)).emit('typing', {
-        senderId: data.senderId,
-        isTyping: data.isTyping
-      });
-    }
-  });
-  
-  // Handle read receipts
-  socket.on('messageRead', (data) => {
-    if (data.senderId && onlineUsers.has(data.senderId)) {
-      io.to(onlineUsers.get(data.senderId)).emit('messageRead', {
-        recipientId: data.recipientId,
-        messageId: data.messageId
-      });
-    }
-  });
-  
-  // Handle profile updates
-  socket.on('profileUpdate', (data) => {
-    // Broadcast profile update to all connected users except the sender
-    socket.broadcast.emit('profileUpdated', data);
-  });
-  
-  // Handle disconnect
-  socket.on('disconnect', () => {
-    // Remove user from online users map
-    for (let [userId, socketId] of onlineUsers) {
-      if (socketId === socket.id) {
-        onlineUsers.delete(userId);
-        break;
-      }
-    }
-  });
-});
+// io.on('connection', (socket) => {
+//   // All Socket.io handlers disabled for Vercel
+// });
 
-// Export io instance for controllers
+const io = null; // Mock io for compatibility
+
+// Export mock io instance for controllers
 module.exports.io = io;
 
-// Set io instance in message controller
-const messageController = require('./controllers/messageController');
-messageController.setIo(io);
+// Skip Socket.io setup for Vercel deployment
+// const messageController = require('./controllers/messageController');
+// messageController.setIo(io);
 
 //Server
 const PORT = process.env.PORT || 5000;
