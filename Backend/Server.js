@@ -35,6 +35,16 @@ connectDB();
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Handle favicon requests to prevent 404 errors
+app.get('/favicon.ico', (req, res) => {
+  res.status(204); // No content
+});
+
+// Catch-all route for undefined endpoints
+app.use('*', (req, res) => {
+  res.status(404).json({ message: 'Endpoint not found' });
+});
+
 //Routes
 app.use("/api/auth", authRoutes);
 app.use('/api/users', userRoutes);
@@ -42,6 +52,11 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/messages', messageRoutes);
+
+// Catch-all route for undefined endpoints (after API routes)
+app.use('*', (req, res) => {
+  res.status(404).json({ message: 'Endpoint not found' });
+});
 
 //Socket.io setup
 const io = socketIo(server, {
