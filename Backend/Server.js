@@ -3,17 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-
-// Check if we're running in a serverless environment
-const isServerless = process.env.SERVERLESS === 'true';
-
-let http;
-let server;
-
-if (!isServerless) {
-  http = require("http");
-  server = http.createServer();
-}
+const http = require("http");
 
 const connectDB = require("./config/db.js");
 
@@ -56,23 +46,17 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/messages', messageRoutes);
 
 // Error handling middleware - place this after routes
-app.use((req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+// Catch-all for API routes
+app.use(/^\/api\/.*/, (req, res) => {
+  res.status(404).json({ message: 'API route not found' });
 });
 
 // Export the app instance for Vercel
 module.exports = app;
 
-// Export io for compatibility but set to null in serverless
-module.exports.io = null;
-
 // Only start the server if not in serverless environment
-if (!isServerless) {
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  const server = http.createServer(app);
   const PORT = process.env.PORT || 5000;
-  server.on('request', app);
   server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
-
-// For serverless environments, set io to null
-// const messageController = require('./controllers/messageController');
-// messageController.setIo(null);
