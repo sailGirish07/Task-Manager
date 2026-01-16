@@ -7,7 +7,9 @@
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd Backend && npm run dev",
     "install:all": "npm install && cd frontend && npm install && cd ../Backend && npm install",
-    "build:frontend": "cd frontend && npm run build"
+    "build:frontend": "cd frontend && npm run build",
+    "deploy:frontend": "cd frontend && vercel --prod",
+    "deploy:backend": "cd Backend && vercel --prod"
   },
   "keywords": [
     "task-manager",

@@ -1,5 +1,7 @@
-// Load environment variables
-require("dotenv").config();
+// Load environment variables conditionally
+if (process.env.NODE_ENV !== 'production') {
+  require("dotenv").config();
+}
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -55,7 +57,7 @@ app.use(/^\/api\/.*/, (req, res) => {
 module.exports = app;
 
 // Only start server locally
-if (!process.env.VERCEL_ENV) {
+if (!process.env.VERCEL_ENV && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
   const server = http.createServer(app);
   const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
