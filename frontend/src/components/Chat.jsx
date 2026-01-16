@@ -315,7 +315,7 @@ const Chat = () => {
                       message.fileType?.startsWith('image/') ? (
                         // Image file - show directly
                         <img
-                          src={`${window.location.origin.replace(/:\d+$/, ':8000')}${message.fileUrl}`}
+                          src={`${API_PATHS.BASE_URL}${message.fileUrl}`}
                           alt={message.fileName}
                           className="max-w-[120px] max-h-32 rounded-lg object-cover"
                           onError={(e) => {
@@ -326,7 +326,7 @@ const Chat = () => {
                       ) : (
                         // Non-image file - show as attachment
                         <a 
-                          href={`${window.location.origin.replace(/:\d+$/, ':8000')}${message.fileUrl}`}
+                          href={`${API_PATHS.BASE_URL}${message.fileUrl}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex flex-col gap-1"
