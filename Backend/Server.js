@@ -1,10 +1,12 @@
-// Load environment variables conditionally
-if (!process.env.VERCEL_ENV) {
-  require("dotenv").config();
-}
+// Load environment variables
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const http = require("http");
+const { Server } = require("socket.io");
+
+const connectDB = require("./config/db.js");
 
 const authRoutes = require("./routes/authRoutes.js");
 const userRoutes = require("./routes/userRoutes.js");
@@ -28,21 +30,8 @@ app.use(
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Connect to database when the app is first used
-app.use(async (req, res, next) => {
-  // Only connect to database if not already connected
-  if (global.dbConnected !== true) {
-    try {
-      const connectDB = require("./config/db.js");
-      await connectDB();
-      global.dbConnected = true;
-    } catch (error) {
-      console.error('Database connection error:', error);
-      // Continue anyway, since this might be a health check
-    }
-  }
-  next();
-});
+// Connect to database
+connectDB();
 
 // Handle favicon requests to prevent 404 errors
 app.get('/favicon.ico', (req, res) => {
@@ -55,20 +44,55 @@ app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
+
+// Initialize message controller with null io for non-socket environments
+const messageController = require('./controllers/messageController');
+
+// Create HTTP server and Socket.IO instance
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || "*",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+// Initialize message controller with io instance
+messageController.setIo(io);
+
 app.use('/api/messages', messageRoutes);
 
-// Error handling middleware - place this after routes
-// Catch-all for API routes that weren't found
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: 'API route not found' });
-});
-
-// General error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
-});
-
-// Export the app instance for Vercel
+// Export the app instance
 module.exports = app;
 
+// Start the server
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  // Join user room
+  socket.on('join', (userId) => {
+    socket.join(userId);
+  });
+
+  // Handle typing indicator
+  socket.on('typing', (data) => {
+    socket.broadcast.to(data.recipientId).emit('typing', data);
+  });
+
+  // Handle message read receipts
+  socket.on('messageRead', (data) => {
+    socket.broadcast.to(data.senderId).emit('messageRead', data);
+  });
+
+  // Handle profile updates
+  socket.on('profileUpdate', (data) => {
+    socket.broadcast.emit('profileUpdated', data);
+  });
+
+  socket.on('disconnect', () => {
+    // User disconnected
+  });
+});

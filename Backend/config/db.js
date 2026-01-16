@@ -4,10 +4,7 @@ const connectDB = async () => {
   try {
     // In serverless environments, reuse connection if available
     if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGO_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
+      await mongoose.connect(process.env.MONGO_URI);
       console.log("MongoDB connected");
     }
     return mongoose.connection;
