@@ -10,6 +10,7 @@ const connectDB = async () => {
       });
       console.log("MongoDB connected");
     }
+    return mongoose.connection;
   } catch (err) {
     console.error("Error connecting to mongodb", err);
     // Don't exit in serverless environment - let the function complete

@@ -1,13 +1,10 @@
 // Load environment variables conditionally
-if (process.env.NODE_ENV !== 'production') {
+if (!process.env.VERCEL_ENV) {
   require("dotenv").config();
 }
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const http = require("http");
-
-const connectDB = require("./config/db.js");
 
 const authRoutes = require("./routes/authRoutes.js");
 const userRoutes = require("./routes/userRoutes.js");
@@ -27,16 +24,29 @@ app.use(
   })
 );
 
-//Connect Database
-connectDB();
-
-//Middleware
+// Middleware
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Connect to database when the app is first used
+app.use(async (req, res, next) => {
+  // Only connect to database if not already connected
+  if (global.dbConnected !== true) {
+    try {
+      const connectDB = require("./config/db.js");
+      await connectDB();
+      global.dbConnected = true;
+    } catch (error) {
+      console.error('Database connection error:', error);
+      // Continue anyway, since this might be a health check
+    }
+  }
+  next();
+});
+
 // Handle favicon requests to prevent 404 errors
 app.get('/favicon.ico', (req, res) => {
-  res.status(204); // No content
+  res.sendStatus(204); // No content
 });
 
 //Routes
@@ -48,17 +58,17 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/messages', messageRoutes);
 
 // Error handling middleware - place this after routes
-// Catch-all for API routes
-app.use(/^\/api\/.*/, (req, res) => {
+// Catch-all for API routes that weren't found
+app.use('/api/*', (req, res) => {
   res.status(404).json({ message: 'API route not found' });
+});
+
+// General error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something went wrong!' });
 });
 
 // Export the app instance for Vercel
 module.exports = app;
 
-// Only start server locally
-if (!process.env.VERCEL_ENV && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  const server = http.createServer(app);
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-}
