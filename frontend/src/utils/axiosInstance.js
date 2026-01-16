@@ -1,6 +1,9 @@
 import axios from "axios";
 import { BASE_URL } from "./apiPaths";
 
+// We need to import API_PATHS or define the refresh endpoint path
+const REFRESH_ENDPOINT = "/api/auth/refresh-token";
+
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: 30000,
@@ -39,7 +42,8 @@ axiosInstance.interceptors.response.use(
           const refreshToken = localStorage.getItem("refreshToken");
           if (refreshToken) {
             try {
-              const refreshResponse = await axios.post(`${BASE_URL}/api/auth/refresh-token`, {
+              // Use axiosInstance instead of direct axios - but make sure to use full API path
+              const refreshResponse = await axiosInstance.post(REFRESH_ENDPOINT, {
                 refreshToken
               });
               
