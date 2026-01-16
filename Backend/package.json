@@ -2,11 +2,10 @@
   "name": "task-manager",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "Server.js",
   "scripts": {
     "start": "node Server.js",
-    "dev": "nodemon Server.js",
-    "vercel-build": "npm install"
+    "dev": "nodemon Server.js"
   },
   "keywords": [],
   "author": "",
