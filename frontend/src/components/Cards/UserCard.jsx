@@ -1,4 +1,5 @@
 import React from "react";
+import { getUserProfileImageUrl } from "../../utils/imageUtils";
 
 export default function UserCard({ userInfo }) {
   return (
@@ -7,7 +8,7 @@ export default function UserCard({ userInfo }) {
         <div className="flex items-center gap-3">
           {userInfo?.profileImageUrl ? (
             <img
-              src={userInfo?.profileImageUrl}
+              src={getUserProfileImageUrl(userInfo)}
               alt={"Avatar"}
               className="w-12 h-12 rounded-full border-2 border-white"
             />

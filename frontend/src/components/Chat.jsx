@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LuSend, LuMessageSquare, LuPaperclip } from 'react-icons/lu';
-import axiosInstance from '../utils/axiosInstance';
-import { API_PATHS } from '../utils/apiPaths';
+import { LuMessageSquare, LuSend, LuPaperclip } from 'react-icons/lu';
+import axiosInstance from '../../utils/axiosInstance';
+import { API_PATHS } from '../../utils/apiPaths';
 import { socket } from '../utils/socket';
+import { getUserProfileImageUrl } from '../../utils/imageUtils';
 
 const Chat = () => {
   const [conversations, setConversations] = useState([]);
@@ -102,7 +103,6 @@ const Chat = () => {
   }, [fetchConversations]);
 
 
-
   const sendMessage = async (fileToSend = null) => {
     if ((!newMessage.trim() && !fileToSend) || !selectedChat) return;
 
@@ -142,9 +142,6 @@ const Chat = () => {
     }
   };
   
-
-
-
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -220,7 +217,7 @@ const Chat = () => {
               <div className="flex items-center gap-3">
                 {conv.user.profileImageUrl ? (
                   <img
-                    src={conv.user.profileImageUrl}
+                    src={getUserProfileImageUrl(conv.user)}
                     alt={conv.user.name}
                     className="w-10 h-10 rounded-full object-cover"
                   />
@@ -258,7 +255,7 @@ const Chat = () => {
                 <>
                   {conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl ? (
                     <img
-                      src={conversations.find(c => c.user._id === selectedChat.id)?.user.profileImageUrl}
+                      src={getUserProfileImageUrl(conversations.find(c => c.user._id === selectedChat.id)?.user)}
                       alt={conversations.find(c => c.user._id === selectedChat.id)?.user.name}
                       className="w-10 h-10 rounded-full object-cover"
                     />
@@ -290,7 +287,7 @@ const Chat = () => {
                     <div className="mr-2 flex-shrink-0">
                       {message.sender.profileImageUrl ? (
                         <img
-                          src={message.sender.profileImageUrl}
+                          src={getUserProfileImageUrl(message.sender)}
                           alt={message.sender.name}
                           className="w-8 h-8 rounded-full object-cover"
                         />

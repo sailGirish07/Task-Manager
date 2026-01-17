@@ -1,25 +1,32 @@
-import React, { useEffect, useState } from "react";
-import Modal from "../Modal";
-import { LuUsers } from "react-icons/lu";
+import React, { useState, useEffect } from "react";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
-import AvatarGroup from "../AvatarGroup";
+import Modal from "../Modal";
+import { getUserProfileImageUrl } from "../../utils/imageUtils";
 
-export default function SelectUsers({ selectedUsers, setSelectedUsers, id }) {
-  const [allUsers, setAllUser] = useState([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+export default function SelectUsers({ selectedUsers, setSelectedUsers }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
   const [tempSelectedUsers, setTempSelectedUsers] = useState([]);
 
-  const getAllUsers = async () => {
-    try {
-      const response = await axiosInstance.get(API_PATHS.USERS.GET_ALL_USERS);
-      if (response.data?.length > 0) {
-        setAllUser(response.data);
+  useEffect(() => {
+    setTempSelectedUsers(selectedUsers);
+  }, [selectedUsers]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await axiosInstance.get(API_PATHS.USERS.GET_ALL_USERS_FOR_MESSAGING);
+        setAllUsers(response.data.users);
+      } catch (error) {
+        console.error("Error fetching users:", error);
       }
-    } catch (error) {
-      console.error("Error fetching users:", error);
+    };
+
+    if (isOpen) {
+      fetchUsers();
     }
-  };
+  }, [isOpen]);
 
   const toggleUserSelection = (userId) => {
     setTempSelectedUsers((prev) =>
@@ -31,51 +38,47 @@ export default function SelectUsers({ selectedUsers, setSelectedUsers, id }) {
 
   const handleAssign = () => {
     setSelectedUsers(tempSelectedUsers);
-    setIsModalOpen(false);
+    setIsOpen(false);
   };
 
-  const selectedUserAvatars = allUsers
+  const selectedUserImages = allUsers
     .filter((user) => selectedUsers.includes(user._id))
-    .map((user) => user.profileImageUrl);
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      await getAllUsers();
-    };
-
-    fetchUsers();
-  }, []);
-
-  useEffect(() => {
-    setTempSelectedUsers(selectedUsers);
-
-    return () => {};
-  }, [selectedUsers]);
+    .map((user) => getUserProfileImageUrl(user));
 
   return (
-    <div className="space-y-4 mt-2">
-      {selectedUserAvatars.length === 0 ? (
-        <button id={id} className="card-btn" onClick={() => setIsModalOpen(true)}>
-          <LuUsers className="text-sm" />
-          Add Members
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-medium">Select Users:</span>
+        <button
+          className="text-primary text-sm underline"
+          onClick={() => setIsOpen(true)}
+        >
+          {selectedUsers.length > 0 ? `(${selectedUsers.length} selected)` : "Select"}
         </button>
-      ) : (
-        <button id={id} className="card-btn" onClick={() => setIsModalOpen(true)}>
-          <LuUsers className="text-sm" />
-          Edit Members ({selectedUserAvatars.length})
-        </button>
-      )}
+      </div>
 
-      {selectedUserAvatars.length > 0 && (
-        <div className="cursor-pointer" onClick={() => setIsModalOpen(true)}>
-          <AvatarGroup avatars={selectedUserAvatars} maxVisible={3} />
+      {selectedUserImages.length > 0 && (
+        <div className="flex gap-2 mb-4">
+          {selectedUserImages.slice(0, 5).map((imgUrl, index) => (
+            <img
+              key={index}
+              src={imgUrl}
+              alt={`Selected user ${index + 1}`}
+              className="w-8 h-8 rounded-full border-2 border-white"
+            />
+          ))}
+          {selectedUserImages.length > 5 && (
+            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium">
+              +{selectedUserImages.length - 5}
+            </div>
+          )}
         </div>
       )}
 
       <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
         title="Select Users"
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
       >
         <div className="space-y-4 h-[60vh] overflow-y-auto">
           {allUsers.map((user) => (
@@ -85,7 +88,7 @@ export default function SelectUsers({ selectedUsers, setSelectedUsers, id }) {
             >
               {user.profileImageUrl ? (
                 <img
-                  src={user.profileImageUrl}
+                  src={getUserProfileImageUrl(user)}
                   alt={user.name}
                   className="w-10 h-10 rounded-full"
                 />

@@ -6,6 +6,7 @@ import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import uploadImage from "../../utils/uploadImage";
 import { socket } from "../../components/utils/socket";
+import { getUserProfileImageUrl } from "../../utils/imageUtils";
 // import { useContext } from "react";
 export default function SideMenu({ activeMenu }) {
   const [sideMenuData, setSideMenuData] = useState([]);
@@ -98,7 +99,7 @@ export default function SideMenu({ activeMenu }) {
         {user?.profileImageUrl ? (
           <div className="relative group">
             <img
-              src={user?.profileImageUrl}
+              src={getUserProfileImageUrl(user)}
               alt="Profile Image"
               className="w-20 h-20 bg-slate-400 rounded-full"
             />
