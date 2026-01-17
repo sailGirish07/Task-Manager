@@ -1,629 +1,213 @@
-import { useState, useEffect, useContext, useRef } from "react";
-import axiosInstance from "../utils/axiosInstance";
-import { API_PATHS, BASE_URL } from "../utils/apiPaths";
-import { UserContext } from "../context/UserContext";
-import { socket } from "./utils/socket";
+import React, { useState, useEffect, useRef, useContext } from "react";
+import { LuSearch, LuSend, LuX, LuMoreVertical, LuTrash2 } from "react-icons/lu";
+import axiosInstance from "../../utils/axiosInstance";
+import { API_PATHS } from "../../utils/apiPaths";
+import { socket } from "../utils/socket";
+import { UserContext } from "../../context/UserContext";
+import { getUserProfileImageUrl } from "../../utils/imageUtils";
+
+const BASE_URL = "https://task-manager-1-j9dy.onrender.com";
 
 const MessagingModal = ({ isOpen, onClose }) => {
-  const { user } = useContext(UserContext);
-  const [activeTab, setActiveTab] = useState("personal");
   const [conversations, setConversations] = useState([]);
-
   const [selectedChat, setSelectedChat] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState({});
   const [newMessage, setNewMessage] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [fileName, setFileName] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [allUsers, setAllUsers] = useState([]); // For messaging
-  const [onlineUsers, setOnlineUsers] = useState(new Set()); // Track online users
+  const [users, setUsers] = useState([]);
+  const [showUsers, setShowUsers] = useState(false);
   const [contextMenu, setContextMenu] = useState({
-    show: false,
+    visible: false,
     x: 0,
     y: 0,
     messageId: null,
-  }); // Context menu for message deletion
-  const [typingUsers, setTypingUsers] = useState({}); // Track typing indicators
-  const [readReceipts, setReadReceipts] = useState({}); // Track read receipts
-  const contextMenuRef = useRef(null);
-  const messagesEndRef = useRef(null); // For auto-scrolling to bottom
-  const messagesContainerRef = useRef(null); // For messages container
-  const typingTimeoutRef = useRef({}); // Track typing timeouts
-  
-  // Typing indicator state
-  const [isTyping, setIsTyping] = useState(false);
-  
-  // Cleanup function for typing timeouts
-  useEffect(() => {
-    // Initialize typing timeout refs
-    return () => {
-      // Clear any typing timeouts when component unmounts
-      Object.keys(typingTimeoutRef.current).forEach(key => {
-        if (typingTimeoutRef.current[key]) {
-          clearTimeout(typingTimeoutRef.current[key]);
-        }
-      });
-      // Clear all typing indicators
-      setTypingUsers({});
-    };
-  }, []);
-  // Fetch initial data
-  useEffect(() => {
-    if (isOpen) {
-      fetchConversations();
-      fetchAllUsers(); // For messaging
-      checkOnlineStatus(); // Initial check
-
-      // Connect to socket and join user room
-      if (typeof socket !== "undefined" && socket && user) {
-        socket.emit("join", user._id);
-      }
-
-      // Poll online status every 30 seconds
-      const intervalId = setInterval(() => {
-        checkOnlineStatus();
-      }, 30000);
-
-      // Cleanup interval on modal close
-      return () => clearInterval(intervalId);
-    }
-  }, [isOpen, user]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Handle clicks outside context menu to close it
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        contextMenuRef.current &&
-        !contextMenuRef.current.contains(event.target)
-      ) {
-        setContextMenu({ show: false, x: 0, y: 0, messageId: null });
-      }
-    };
-
-    if (contextMenu.show) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [contextMenu.show]);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    const scrollToBottom = () => {
-      if (messagesContainerRef.current) {
-        // Use setTimeout to ensure DOM is updated before scrolling
-        setTimeout(() => {
-          // Scroll to the bottom
-          messagesContainerRef.current.scrollTop =
-            messagesContainerRef.current.scrollHeight;
-        }, 50); // Small delay to ensure DOM update
-      }
-    };
-
-    // Only scroll when new messages are added (not on initial load)
-    if (messages.length > 0) {
-      scrollToBottom();
-    }
-  }, [messages]); // Only run when messages change
-  
-  // Update read receipts when messages change
-  useEffect(() => {
-    // Update read receipts based on message status
-    const newReadReceipts = {};
-    messages.forEach(msg => {
-      if (msg.status === 'read') {
-        newReadReceipts[msg._id] = 'read';
-      }
-    });
-    setReadReceipts(newReadReceipts);
-  }, [messages]);
-  
-  // Handle typing indicators
-  useEffect(() => {
-    if (typeof socket !== "undefined" && socket && selectedChat && selectedChat.type === "user") {
-      // Send typing indicator when user starts typing
-      if (newMessage.trim() !== "") {
-        if (!isTyping) {
-          setIsTyping(true);
-          socket.emit('typing', {
-            recipientId: selectedChat.id,
-            senderId: user._id,
-            isTyping: true
-          });
-        }
-        
-        // Clear any existing timeout
-        if (typingTimeoutRef.current[selectedChat.id]) {
-          clearTimeout(typingTimeoutRef.current[selectedChat.id]);
-        }
-        
-        // Set new timeout to stop typing indicator after 1 second of inactivity
-        typingTimeoutRef.current[selectedChat.id] = setTimeout(() => {
-          setIsTyping(false);
-          socket.emit('typing', {
-            recipientId: selectedChat.id,
-            senderId: user._id,
-            isTyping: false
-          });
-        }, 1000);
-      } else {
-        // If message is empty, stop typing indicator
-        if (isTyping) {
-          setIsTyping(false);
-          socket.emit('typing', {
-            recipientId: selectedChat.id,
-            senderId: user._id,
-            isTyping: false
-          });
-        }
-        
-        // Clear any existing timeout when message is empty
-        if (typingTimeoutRef.current[selectedChat.id]) {
-          clearTimeout(typingTimeoutRef.current[selectedChat.id]);
-        }
-      }
-    }
-    
-    return () => {
-      // Clear timeout when component unmounts
-      if (typingTimeoutRef.current[selectedChat?.id]) {
-        clearTimeout(typingTimeoutRef.current[selectedChat?.id]);
-      }
-    };
-  }, [newMessage, selectedChat, socket, user._id, isTyping]);
-  
-  // Listen for typing indicators from other users
-  useEffect(() => {
-    if (typeof socket !== "undefined" && socket && isOpen && selectedChat && selectedChat.type === "user") {
-      const handleTyping = (data) => {
-        if (data.senderId === selectedChat.id) {
-          setTypingUsers(prev => ({
-            ...prev,
-            [selectedChat.id]: data.isTyping
-          }));
-          
-          // Clear typing indicator after 1.5 seconds of inactivity
-          if (typingTimeoutRef.current[`typing_${selectedChat.id}`]) {
-            clearTimeout(typingTimeoutRef.current[`typing_${selectedChat.id}`]);
-          }
-          
-          // Set timeout to clear typing indicator after 1.5 seconds
-          typingTimeoutRef.current[`typing_${selectedChat.id}`] = setTimeout(() => {
-            setTypingUsers(prev => ({
-              ...prev,
-              [selectedChat.id]: false
-            }));
-          }, 1500);
-        }
-      };
-      
-      socket.on('typing', handleTyping);
-      
-      return () => {
-        socket.off('typing', handleTyping);
-        // Clear any typing timeout on unmount
-        if (typingTimeoutRef.current[`typing_${selectedChat.id}`]) {
-          clearTimeout(typingTimeoutRef.current[`typing_${selectedChat.id}`]);
-        }
-      };
-    }
-  }, [socket, selectedChat, isOpen]);
-  
-  // Listen for read receipts
-  useEffect(() => {
-    if (typeof socket !== "undefined" && socket && isOpen && selectedChat && selectedChat.type === "user") {
-      const handleReadReceipt = (data) => {
-        // Update message status when recipient reads the message
-        setReadReceipts(prev => ({
-          ...prev,
-          [data.messageId]: 'read'
-        }));
-        
-        // Update the specific message status to 'read'
-        setMessages(prevMessages => 
-          prevMessages.map(msg => 
-            msg._id === data.messageId ? { ...msg, status: 'read' } : msg
-          )
-        );
-      };
-      
-      socket.on('messageRead', handleReadReceipt);
-      
-      return () => {
-        socket.off('messageRead', handleReadReceipt);
-      };
-    }
-  }, [socket, isOpen, selectedChat]);
-  
-  // Send read receipts when messages are viewed
-  useEffect(() => {
-    if (selectedChat && messages.length > 0 && typeof socket !== "undefined" && socket && selectedChat.type === "user") {
-      // Find messages from the selected user that haven't been marked as read
-      const unreadMessages = messages.filter(msg => 
-        msg.sender?._id === selectedChat.id && 
-        msg.status !== 'read'
-      );
-      
-      if (unreadMessages.length > 0) {
-        // Mark these messages as read
-        unreadMessages.forEach(msg => {
-          // Update local message status
-          setMessages(prevMessages => 
-            prevMessages.map(m => 
-              m._id === msg._id ? { ...m, status: 'read' } : m
-            )
-          );
-          
-          // Send read receipt via socket
-          socket.emit('messageRead', {
-            senderId: msg.sender._id,
-            recipientId: user._id,
-            messageId: msg._id
-          });
-          
-          // Update message status in backend
-          axiosInstance.put(API_PATHS.MESSAGES.MARK_MESSAGES_AS_READ, {
-            senderId: msg.sender._id
-          }).catch(err => {
-            console.error('Error marking message as read:', err);
-          });
-        });
-      }
-    }
-  }, [selectedChat, messages, socket, user._id]);
-
-  // Handle real-time messages
-  useEffect(() => {
-    if (typeof socket !== "undefined" && socket && isOpen) {
-      const handleNewMessage = (data) => {
-        // Update conversations list with new message
-        setConversations((prevConversations) => {
-          const updatedConversations = [...prevConversations];
-          const conversationIndex = updatedConversations.findIndex(
-            (conv) => conv.user._id === data.sender._id
-          );
-
-          if (conversationIndex !== -1) {
-            // Update existing conversation
-            updatedConversations[conversationIndex] = {
-              ...updatedConversations[conversationIndex],
-              lastMessage: data.conversationUpdate.lastMessage,
-              lastMessageAt: data.conversationUpdate.lastMessageAt,
-              unreadCount:
-                updatedConversations[conversationIndex].unreadCount + 1,
-            };
-          } else {
-            // Add new conversation if not exists
-            updatedConversations.unshift({
-              user: data.sender,
-              lastMessage: data.conversationUpdate.lastMessage,
-              lastMessageAt: data.conversationUpdate.lastMessageAt,
-              unreadCount: 1,
-            });
-          }
-
-          return updatedConversations;
-        });
-
-        // If this message is for the currently selected chat, update messages
-        if (
-          selectedChat &&
-          selectedChat.type === "user" &&
-          selectedChat.id === data.sender._id
-        ) {
-          // Add the new message to the messages array
-          setMessages((prevMessages) => [...prevMessages, data.message]);
-        }
-      };
-
-      socket.on("newMessage", handleNewMessage);
-
-      return () => {
-        if (typeof socket !== "undefined" && socket) {
-          socket.off("newMessage", handleNewMessage);
-        }
-      };
-    }
-  }, [socket, selectedChat, isOpen]);
-
-  // Fetch messages when a chat is selected
-  useEffect(() => {
-    if (selectedChat) {
-      fetchMessages();
-      
-      // Only mark as read/delivered for direct messages
-      if (selectedChat.type === "user") {
-        markMessagesAsRead(); // Mark as read when opening chat
-        updateMessageStatusToDelivered(); // Update to delivered if not already
-      }
-    }
-  }, [selectedChat]); // eslint-disable-line react-hooks/exhaustive-deps
+    canDelete: false,
+  });
+  const [newUsers, setNewUsers] = useState([]);
+  const messagesContainerRef = useRef(null);
+  const { user } = useContext(UserContext);
 
   const fetchConversations = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
-      const response = await axiosInstance.get(
-        API_PATHS.MESSAGES.GET_CONVERSATIONS
-      );
-      setConversations(response.data.conversations || []);
+      const response = await axiosInstance.get(API_PATHS.MESSAGES.GET_CONVERSATIONS);
+      setConversations(response.data.conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
-      setError("Failed to load conversations");
-      setConversations([]);
-    } finally {
-      setLoading(false);
     }
   };
 
-  const fetchAllUsers = async () => {
+  const fetchUsers = async () => {
     try {
-      const response = await axiosInstance.get(
-        API_PATHS.USERS.GET_ALL_USERS_FOR_MESSAGING
-      );
-      setAllUsers(response.data.users || []);
+      const response = await axiosInstance.get(API_PATHS.USERS.GET_ALL_USERS_FOR_MESSAGING);
+      const currentUserID = localStorage.getItem('userId');
+      setUsers(response.data.users.filter(user => user._id !== currentUserID));
     } catch (error) {
       console.error("Error fetching users:", error);
-      setAllUsers([]);
     }
   };
 
-  const checkOnlineStatus = async () => {
-    // Fetch real online status from backend
+  const fetchMessages = async (chatId) => {
     try {
       const response = await axiosInstance.get(
-        API_PATHS.USERS.GET_ONLINE_STATUS
+        API_PATHS.MESSAGES.GET_DIRECT_MESSAGES(chatId)
       );
-      const onlineIds = new Set(response.data.onlineUserIds || []);
-      setOnlineUsers(onlineIds);
-    } catch (error) {
-      console.error("Error checking online status:", error);
-      // Keep previous state on error
-    }
-  };
-
-
-
-  const fetchMessages = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await axiosInstance.get(
-        API_PATHS.MESSAGES.GET_DIRECT_MESSAGES(selectedChat.id)
-      );
-      setMessages(response.data.messages?.reverse() || []);
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: response.data.messages.reverse()
+      }));
     } catch (error) {
       console.error("Error fetching messages:", error);
-      setError("Failed to load messages");
-      setMessages([]);
-    } finally {
-      setLoading(false);
     }
   };
 
-  const markMessagesAsRead = async () => {
-    if (!selectedChat || selectedChat.type !== "user") return;
+  const sendMessage = async (chatId) => {
+    if (!newMessage.trim() || !chatId) return;
 
     try {
-      await axiosInstance.put(API_PATHS.MESSAGES.MARK_MESSAGES_AS_READ, {
-        senderId: selectedChat.id,
+      const response = await axiosInstance.post(API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE, {
+        recipientId: chatId,
+        content: newMessage,
+        messageType: 'text'
       });
-    } catch (error) {
-      console.error("Error marking messages as read:", error);
-    }
-  };
 
-  const updateMessageStatusToDelivered = async () => {
-    if (!selectedChat || selectedChat.type !== "user") return;
+      // Update messages state
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: [...(prev[chatId] || []), response.data.message]
+      }));
 
-    try {
-      await axiosInstance.put(API_PATHS.MESSAGES.UPDATE_MESSAGE_STATUS, {
-        senderId: selectedChat.id,
-      });
+      setNewMessage("");
+      fetchConversations(); // Refresh conversations to update last message
     } catch (error) {
-      console.error("Error updating message status:", error);
+      console.error("Error sending message:", error);
     }
   };
 
   const deleteMessage = async (messageId) => {
-    // Close context menu first
-    setContextMenu({ show: false, x: 0, y: 0, messageId: null });
-
-    if (!window.confirm("Are you sure you want to delete this message?")) {
-      return;
-    }
-
     try {
-      await axiosInstance.delete(API_PATHS.MESSAGES.DELETE_MESSAGE(messageId));
-      // Refresh messages
-      await fetchMessages();
-      // Clear any previous error
-      setError(null);
+      await axiosInstance.delete(`${API_PATHS.MESSAGES.DELETE_MESSAGE}/${messageId}`);
+      
+      // Update messages to mark as deleted
+      setMessages(prev => {
+        const updated = {...prev};
+        Object.keys(updated).forEach(chatId => {
+          updated[chatId] = updated[chatId].map(msg => 
+            msg._id === messageId ? {...msg, isDeleted: true} : msg
+          );
+        });
+        return updated;
+      });
     } catch (error) {
       console.error("Error deleting message:", error);
-      if (error.response?.status === 404) {
-        setError("Message not found or already deleted");
-      } else {
-        setError(
-          "Failed to delete message: " +
-            (error.response?.data?.message || error.message)
-        );
-      }
     }
   };
 
-  const sendMessage = async (fileToSend = null) => {
-    if ((!newMessage.trim() && !fileToSend) || !selectedChat) return;
-
-    try {
-      setError(null);
-      
-      const formData = new FormData();
-      formData.append('recipientId', selectedChat.id);
-      formData.append('messageType', fileToSend ? 'file' : 'text');
-      
-      if (newMessage.trim()) {
-        formData.append('content', newMessage);
-      }
-      
-      if (fileToSend) {
-        formData.append('file', fileToSend);
-      }
-
-      // Send with progress tracking
-      await axiosInstance.post(
-        API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          },
-          onUploadProgress: (progressEvent) => {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            setUploadProgress(progress);
-          }
-        }
-      );
-
-      setNewMessage("");
-      setSelectedFile(null);
-      setFileName("");
-      setIsUploading(false);
-      setUploadProgress(0);
-      await fetchMessages();
-      
-    } catch (error) {
-      console.error("Error sending message:", error);
-      setError("Failed to send message. Please try again.");
-    }
-  };
-  
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        setError("File size exceeds 10MB limit");
-        return;
-      }
-      setSelectedFile(file);
-      setFileName(file.name);
-      setIsUploading(true);
-      setUploadProgress(0); // Reset progress
-      // Don't send immediately - let user click send button
-    }
-  };
-  
-  const triggerFileInput = () => {
-    document.getElementById('fileInput').click();
-  };
-
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e, chatId) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      sendMessage(chatId);
     }
   };
 
-
-
-  const isUserOnline = (userId) => {
-    return onlineUsers.has(userId);
-  };
-
-  const getInitials = (name) => {
-    return name?.charAt(0).toUpperCase() || "?";
-  };
-
-  const formatMessageTime = (timestamp) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-
-    // Check if same day
-    const isToday = date.toDateString() === today.toDateString();
-
-    // Check if yesterday
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday = date.toDateString() === yesterday.toDateString();
-
-    if (isToday) {
-      // Show time for today's messages
-      return date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-    } else if (isYesterday) {
-      return "Yesterday";
-    } else {
-      // Show date for older messages
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
+  const handleSelectChat = (chat) => {
+    setSelectedChat(chat);
+    if (!messages[chat.user._id]) {
+      fetchMessages(chat.user._id);
     }
+    setShowUsers(false);
   };
+
+  const filteredConversations = conversations.filter(conv =>
+    conv.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    conv.lastMessage.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredUsers = users.filter(user =>
+    user.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+    !conversations.some(conv => conv.user._id === user._id)
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchConversations();
+      fetchUsers();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (contextMenu.visible) {
+        setContextMenu({ ...contextMenu, visible: false });
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [contextMenu]);
 
   const handleContextMenu = (e, messageId, canDelete) => {
-    e.preventDefault(); // Prevent default context menu
-
-    if (!canDelete) return; // Only show context menu if user can delete the message
-
-    // Calculate position to ensure menu stays within viewport
-    const menuWidth = 120; // Approximate width of the context menu
-    const menuHeight = 40; // Approximate height of the context menu
-
-    let posX = e.clientX;
-    let posY = e.clientY;
-
-    // Adjust position if menu would go outside viewport
-    if (posX + menuWidth > window.innerWidth) {
-      posX = window.innerWidth - menuWidth - 10;
-    }
-    if (posY + menuHeight > window.innerHeight) {
-      posY = window.innerHeight - menuHeight - 10;
-    }
-
+    e.preventDefault();
     setContextMenu({
-      show: true,
-      x: posX,
-      y: posY,
-      messageId: messageId,
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      messageId,
+      canDelete,
     });
   };
 
-  const filteredConversations =
-    conversations?.filter(
-      (conv) =>
-        conv.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        conv.user?.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [];
+  const getInitials = (name) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
+  };
 
-  // Filter all users for starting new conversations
-  const filteredAllUsers =
-    allUsers?.filter(
-      (u) =>
-        u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [];
+  const isUserOnline = (userId) => {
+    return socket.activeUsers?.includes(userId);
+  };
 
-  // Get user IDs already in conversations to avoid duplicates
-  const conversationUserIds = new Set(
-    conversations?.map((conv) => conv.user._id) || []
-  );
+  // Listen for new messages
+  useEffect(() => {
+    const handleMessageReceive = (message) => {
+      setMessages(prev => {
+        const updated = { ...prev };
+        const chatId = message.sender._id === localStorage.getItem('userId') 
+          ? message.recipient._id 
+          : message.sender._id;
+        
+        if (!updated[chatId]) {
+          updated[chatId] = [];
+        }
+        
+        updated[chatId] = [...updated[chatId], message];
+        return updated;
+      });
 
-  // Users not in conversations yet (for new conversations)
-  const newUsers = filteredAllUsers.filter(
-    (u) => !conversationUserIds.has(u._id)
-  );
+      // Update conversations to show new message
+      setConversations(prev => 
+        prev.map(conv => {
+          if (conv.user._id === message.sender._id) {
+            return {
+              ...conv,
+              lastMessage: message.content,
+              lastMessageTime: message.createdAt
+            };
+          }
+          return conv;
+        })
+      );
+    };
 
-  // Handle profile updates
+    socket.on('receiveMessage', handleMessageReceive);
+
+    return () => {
+      socket.off('receiveMessage', handleMessageReceive);
+    };
+  }, []);
+
+  // Listen for profile updates
   useEffect(() => {
     const handleProfileUpdate = (data) => {
       // Update conversations with new profile image
@@ -634,248 +218,195 @@ const MessagingModal = ({ isOpen, onClose }) => {
             : conv
         )
       );
-        
-      // Update all users list
-      setAllUsers(prevUsers => 
-        prevUsers.map(user => 
-          user._id === data.userId
-            ? { ...user, profileImageUrl: data.profileImageUrl, name: data.name }
-            : user
-        )
-      );
-        
+      
       // Update messages if the sender is the updated user
-      setMessages(prevMessages => 
-        prevMessages.map(message => 
-          message.sender && message.sender._id === data.userId
-            ? { ...message, sender: { ...message.sender, profileImageUrl: data.profileImageUrl, name: data.name } }
-            : message
-        )
-      );
-        
+      setMessages(prevMessages => {
+        const updatedMessages = {};
+        Object.keys(prevMessages).forEach(chatId => {
+          updatedMessages[chatId] = prevMessages[chatId].map(message => 
+            message.sender._id === data.userId
+              ? { ...message, sender: { ...message.sender, profileImageUrl: data.profileImageUrl, name: data.name } }
+              : message
+          );
+        });
+        return updatedMessages;
+      });
+      
       // Update selected chat if it's the updated user
-      if (selectedChat && selectedChat.type === 'user' && selectedChat.id === data.userId) {
+      if (selectedChat && selectedChat.user._id === data.userId) {
         setSelectedChat(prev => ({
           ...prev,
-          name: data.name,
-          profileImageUrl: data.profileImageUrl
+          user: { ...prev.user, profileImageUrl: data.profileImageUrl, name: data.name }
         }));
       }
     };
-      
-    const handleProfileUpdateAndRefresh = (data) => {
-      handleProfileUpdate(data);
-      fetchConversations(); // Refresh conversations to ensure latest data
-    };
-      
-    if (typeof socket !== "undefined" && socket && isOpen) {
-      socket.on('profileUpdated', handleProfileUpdateAndRefresh);
-    }
-      
+    
+    socket.on('profileUpdated', handleProfileUpdate);
+    
     return () => {
-      if (typeof socket !== "undefined" && socket) {
-        socket.off('profileUpdated', handleProfileUpdateAndRefresh);
-      }
+      socket.off('profileUpdated', handleProfileUpdate);
     };
-  }, [socket, isOpen, selectedChat, fetchConversations]);
+  }, [selectedChat]);
 
-
-  if (!isOpen) return null;
+  // Auto-scroll to bottom of messages
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [messages, selectedChat]);
 
   return (
     <div
-      className="fixed top-0 left-0 w-screen h-screen z-[99999] flex items-center justify-center bg-black/50"
-      style={{ margin: 0, padding: "1rem" }}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
+        isOpen ? "block" : "hidden"
+      }`}
     >
+      {/* Backdrop */}
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col"
-        style={{ height: "85vh", maxHeight: "90vh" }}
-      >
-        {/* HEADER */}
-        <div className="flex items-center justify-between px-6 py-5 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">Messages</h2>
-        </div>
+        className="absolute inset-0 bg-black bg-opacity-50"
+        onClick={onClose}
+      ></div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mx-6 mt-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-            <svg
-              className="w-5 h-5 text-red-500 flex-shrink-0"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span className="text-sm text-red-700">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-500 hover:text-red-700"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          </div>
-        )}
+      {/* Modal Content */}
+      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex overflow-hidden z-10">
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full z-10"
+        >
+          <LuX className="text-lg" />
+        </button>
 
-        {/* BODY */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex w-full h-full">
           {/* SIDEBAR */}
-          <div className="w-[340px] border-r flex flex-col h-full">
-            {/* Search */}
-            <div className="px-5 py-5 border-b">
-              <div className="relative">
-                <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+          <div className="w-80 border-r flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b">
+              <div className="flex gap-2 mb-4">
+                <button
+                  className={`py-2 px-4 rounded-lg text-sm font-medium ${
+                    !showUsers
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                  onClick={() => setShowUsers(false)}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+                  <LuSend className="inline mr-2" />
+                  Chats
+                </button>
+                <button
+                  className={`py-2 px-4 rounded-lg text-sm font-medium ${
+                    showUsers
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                  onClick={() => setShowUsers(true)}
+                >
+                  <LuSearch className="inline mr-2" />
+                  Search
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="relative">
+                <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Search users to message..."
+                  type="text"
+                  placeholder="Search chats..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              {searchTerm && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Found {filteredConversations.length + newUsers.length} result(s)
-                </p>
-              )}
             </div>
 
-
-
-            {/* User/Group List */}
+            {/* Content Area */}
             <div className="flex-1 overflow-y-auto">
-              {loading && (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              {!selectedChat && !showUsers && filteredConversations.length === 0 && (
+                <div className="text-center text-gray-400 py-8">
+                  <svg
+                    className="w-12 h-12 mx-auto mb-3 text-gray-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
+                  </svg>
+                  <p>No conversations yet</p>
+                  <p className="text-xs mt-1">Start messaging a team member</p>
                 </div>
               )}
-              {activeTab === "personal" && (
-                <>
-                  {/* Existing Conversations */}
-                  {filteredConversations.length > 0 && (
-                    <>
-                      {searchTerm && (
-                        <div className="px-5 py-2 text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                          Conversations
-                        </div>
-                      )}
-                      {filteredConversations.map((conv) => (
-                        <div
-                          key={conv.user._id}
-                          onClick={() => {
-                            setSelectedChat({
-                              type: "user",
-                              id: conv.user._id,
-                              name: conv.user.name,
-                              email: conv.user.email,
-                               profileImageUrl: conv.user.profileImageUrl, 
-                            });
-                            setSearchTerm("");
-                          }}
-                          className={`px-5 py-4 cursor-pointer transition-all duration-200 ${
-                            selectedChat?.type === "user" &&
-                            selectedChat?.id === conv.user._id
-                              ? "bg-blue-50 border-l-4 border-l-blue-600"
-                              : "border-l-4 border-l-transparent hover:bg-gray-50"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="relative">
-                              {conv.user.profileImageUrl ? (
-                                <img
-                                  src={conv.user.profileImageUrl}
-                                  alt={conv.user.name}
-                                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                                  {getInitials(conv.user.name)}
-                                </div>
-                              )}
-                              {/* Online/Offline Status Indicator */}
-                              <div
-                                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
-                                  isUserOnline(conv.user._id)
-                                    ? "bg-green-500"
-                                    : "bg-gray-300"
-                                }`}
-                              ></div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <p className="font-medium text-gray-900 text-sm">
-                                  {conv.user.name}
-                                </p>
-                                <span className="text-xs text-gray-400">
-                                  {new Date(
-                                    conv.lastMessageAt
-                                  ).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <p className="text-xs text-gray-500 truncate">
-                                {conv.lastMessage}
-                              </p>
-                            </div>
-                            {selectedChat?.type === "user" &&
-                              selectedChat?.id === conv.user._id && (
-                                <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                              )}
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  )}
 
-                  {/* New Users (not in conversations yet) */}
-                  {searchTerm && newUsers.length > 0 && (
-                    <>
-                      <div className="px-5 py-2 text-xs font-semibold text-gray-500 uppercase bg-gray-50 sticky top-0">
-                        New Conversation
+              {showUsers ? (
+                <>
+                  {/* Users Search Results */}
+                  <>
+                    {searchTerm && (
+                      <div className="p-4 border-b">
+                        <h3 className="font-medium text-gray-900 mb-3">Users</h3>
+                        {filteredUsers.length > 0 ? (
+                          filteredUsers.map((user) => (
+                            <div
+                              key={user._id}
+                              className="p-3 border-b cursor-pointer hover:bg-gray-50 flex items-center gap-3"
+                              onClick={() => handleSelectChat({ user })}
+                            >
+                              <div className="relative">
+                                {user.profileImageUrl ? (
+                                  <img
+                                    src={getUserProfileImageUrl(user)}
+                                    alt={user.name}
+                                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                                    {getInitials(user.name)}
+                                  </div>
+                                )}
+                                {/* Online/Offline Status Indicator */}
+                                <div
+                                  className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                                    isUserOnline(user._id)
+                                      ? "bg-green-500"
+                                      : "bg-gray-300"
+                                  }`}
+                                ></div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 text-sm">
+                                  {user.name}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {user.email}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500 py-2">No users found</p>
+                        )}
                       </div>
-                      {newUsers.map((user) => (
-                        <div
-                          key={user._id}
-                          onClick={() => {
-                            setSelectedChat({
-                              type: "user",
-                              id: user._id,
-                              name: user.name,
-                              email: user.email,
-                            });
-                            setSearchTerm("");
-                          }}
-                          className={`px-5 py-4 cursor-pointer transition-all duration-200 ${
-                            selectedChat?.type === "user" &&
-                            selectedChat?.id === user._id
-                              ? "bg-blue-50 border-l-4 border-l-blue-600"
-                              : "border-l-4 border-l-transparent hover:bg-gray-50"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
+                    )}
+
+                    {/* New Users */}
+                    {newUsers.length > 0 && (
+                      <div className="p-4 border-b">
+                        <h3 className="font-medium text-gray-900 mb-3">New Users</h3>
+                        {newUsers.map((user) => (
+                          <div
+                            key={user._id}
+                            className="p-3 border-b cursor-pointer hover:bg-gray-50 flex items-center gap-3"
+                            onClick={() => handleSelectChat({ user })}
+                          >
                             <div className="relative">
                               {user.profileImageUrl ? (
                                 <img
-                                  src={user.profileImageUrl}
+                                  src={getUserProfileImageUrl(user)}
                                   alt={user.name}
                                   className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                                 />
@@ -901,18 +432,167 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                 {user.email}
                               </p>
                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* All Conversations */}
+                    <div className="p-4">
+                      <h3 className="font-medium text-gray-900 mb-3">Recent Conversations</h3>
+                      {conversations.length > 0 ? (
+                        conversations.map((conv) => (
+                          <div
+                            key={conv.user._id}
+                            className={`p-3 border-b cursor-pointer hover:bg-gray-50 flex items-center gap-3 ${
+                              selectedChat?.user._id === conv.user._id
+                                ? "bg-blue-50 border-l-4 border-l-blue-600"
+                                : "border-l-4 border-l-transparent hover:bg-gray-50"
+                            }`}
+                            onClick={() => handleSelectChat(conv)}
+                          >
+                            <div className="flex items-center gap-3">
+                              {conv.user.profileImageUrl ? (
+                                <img
+                                  src={getUserProfileImageUrl(conv.user)}
+                                  alt={conv.user.name}
+                                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                                  {getInitials(conv.user.name)}
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 text-sm">
+                                  {conv.user.name}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {conv.user.email}
+                                </p>
+                              </div>
+                              {selectedChat?.type === "user" &&
+                                selectedChat?.id === conv.user._id && (
+                                  <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500">No recent conversations</p>
+                      )}
+                    </div>
+                  </>
+                </>
+              ) : (
+                <>
+                  {/* Conversations List */}
+                  {searchTerm ? (
+                    <>
+                      {filteredConversations.length > 0 ? (
+                        filteredConversations.map((conv) => (
+                          <div
+                            key={conv.user._id}
+                            className={`p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center gap-3 ${
+                              selectedChat?.user._id === conv.user._id
+                                ? "bg-blue-50 border-l-4 border-l-blue-600"
+                                : "border-l-4 border-l-transparent hover:bg-gray-50"
+                            }`}
+                            onClick={() => handleSelectChat(conv)}
+                          >
+                            <div className="relative">
+                              {conv.user.profileImageUrl ? (
+                                <img
+                                  src={getUserProfileImageUrl(conv.user)}
+                                  alt={conv.user.name}
+                                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                                  {getInitials(conv.user.name)}
+                                </div>
+                              )}
+                              {/* Online/Offline Status Indicator */}
+                              <div
+                                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                                  isUserOnline(conv.user._id)
+                                    ? "bg-green-500"
+                                    : "bg-gray-300"
+                                }`}
+                              ></div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 text-sm">
+                                {conv.user.name}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {conv.user.email}
+                              </p>
+                            </div>
                             {selectedChat?.type === "user" &&
-                              selectedChat?.id === user._id && (
+                              selectedChat?.id === conv.user._id && (
                                 <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                               )}
                           </div>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-gray-400">
+                          <p>No conversations found</p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {conversations.map((conv) => (
+                        <div
+                          key={conv.user._id}
+                          className={`p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center gap-3 ${
+                            selectedChat?.user._id === conv.user._id
+                              ? "bg-blue-50 border-l-4 border-l-blue-600"
+                              : "border-l-4 border-l-transparent hover:bg-gray-50"
+                          }`}
+                          onClick={() => handleSelectChat(conv)}
+                        >
+                          <div className="relative">
+                            {conv.user.profileImageUrl ? (
+                              <img
+                                src={getUserProfileImageUrl(conv.user)}
+                                alt={conv.user.name}
+                                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                                {getInitials(conv.user.name)}
+                              </div>
+                            )}
+                            {/* Online/Offline Status Indicator */}
+                            <div
+                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                                isUserOnline(conv.user._id)
+                                  ? "bg-green-500"
+                                  : "bg-gray-300"
+                              }`}
+                            ></div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 text-sm">
+                              {conv.user.name}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {conv.user.email}
+                            </p>
+                          </div>
+                          {selectedChat?.type === "user" &&
+                            selectedChat?.id === conv.user._id && (
+                              <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                            )}
                         </div>
                       ))}
                     </>
                   )}
 
                   {/* Empty State */}
-                  {!searchTerm && filteredConversations.length === 0 && (
+                  {!searchTerm && conversations.length === 0 && (
                     <div className="text-center text-gray-400 py-8">
                       <svg
                         className="w-12 h-12 mx-auto mb-3 text-gray-300"
@@ -968,41 +648,37 @@ const MessagingModal = ({ isOpen, onClose }) => {
                 <div className="px-6 py-4 border-b flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      {selectedChat.profileImageUrl ? (
+                      {selectedChat.user.profileImageUrl ? (
                         <img
-                          src={selectedChat.profileImageUrl}
-                          alt={selectedChat.name}
+                          src={getUserProfileImageUrl(selectedChat.user)}
+                          alt={selectedChat.user.name}
                           className="w-11 h-11 rounded-full object-cover"
                         />
                       ) : (
                         <div className="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold">
-                          {getInitials(selectedChat.name)}
+                          {getInitials(selectedChat.user.name)}
                         </div>
                       )}
                       {/* Online/Offline Status for chat header */}
-                      {selectedChat.type === "user" && (
-                        <div
-                          className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${
-                            isUserOnline(selectedChat.id)
-                              ? "bg-green-500"
-                              : "bg-gray-300"
-                          }`}
-                        ></div>
-                      )}
+                      <div
+                        className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                          isUserOnline(selectedChat.user._id)
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                      ></div>
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900 text-base">
-                        {selectedChat.name}
+                        {selectedChat.user.name}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        {isUserOnline(selectedChat.id)
+                        {isUserOnline(selectedChat.user._id)
                           ? "Online"
                           : "Offline"}
                       </p>
                     </div>
                   </div>
-
-
                 </div>
 
                 {/* Messages Area */}
@@ -1011,7 +687,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                   className="flex-1 overflow-y-auto p-6 space-y-3 bg-white"
                 >
                   {messages.length > 0 ? (
-                    messages.map((msg) => {
+                    messages[selectedChat.user._id]?.map((msg) => {
                       const isCurrentUser = msg.sender?._id === user?._id;
                       const canDeleteMessage = isCurrentUser;
 
@@ -1025,7 +701,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                           {!isCurrentUser && (
                             msg.sender?.profileImageUrl ? (
                               <img
-                                src={msg.sender.profileImageUrl}
+                                src={getUserProfileImageUrl(msg.sender)}
                                 alt={msg.sender.name}
                                 className="w-9 h-9 rounded-full object-cover mr-2 flex-shrink-0"
                               />
@@ -1111,109 +787,42 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                         </a>
                                       )
                                     ) : (
-                                      <span>{msg.content}</span>
-                                    )}
-                                    {isCurrentUser && (
-                                      <>
-                                        {/* Single tick - sent */}
-                                        {msg.status === "sent" && (
-                                          <svg
-                                            className="w-4 h-4 text-white/70 flex-shrink-0"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              strokeWidth={2.5}
-                                              d="M5 13l4 4L19 7"
-                                            />
-                                          </svg>
-                                        )}
-                                        {/* Double tick - delivered */}
-                                        {msg.status === "delivered" && (
-                                          <div className="flex -space-x-1">
-                                            <svg
-                                              className="w-4 h-4 text-white/70 flex-shrink-0"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2.5}
-                                                d="M5 13l4 4L19 7"
-                                              />
-                                            </svg>
-                                            <svg
-                                              className="w-4 h-4 text-white/70 flex-shrink-0"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2.5}
-                                                d="M5 13l4 4L19 7"
-                                              />
-                                            </svg>
-                                          </div>
-                                        )}
-                                        {/* Double tick green - read */}
-                                        {msg.status === "read" && (
-                                          <div className="flex -space-x-1">
-                                            <svg
-                                              className="w-4 h-4 text-green-400 flex-shrink-0"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2.5}
-                                                d="M5 13l4 4L19 7"
-                                              />
-                                            </svg>
-                                            <svg
-                                              className="w-4 h-4 text-green-400 flex-shrink-0"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2.5}
-                                                d="M5 13l4 4L19 7"
-                                              />
-                                            </svg>
-                                          </div>
-                                        )}
-                                      </>
+                                      <p className="text-sm">{msg.content}</p>
                                     )}
                                   </div>
+                                  <p
+                                    className={`text-xs mt-1 ${
+                                      isCurrentUser
+                                        ? "text-blue-100 text-right"
+                                        : "text-gray-500"
+                                    }`}
+                                  >
+                                    {new Date(msg.createdAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </p>
                                 </div>
-                                {/* Message timestamp */}
-                                <span
-                                  className={`text-xs mt-1 ${
-                                    isCurrentUser
-                                      ? "text-gray-400"
-                                      : "text-gray-500"
-                                  }`}
-                                >
-                                  {formatMessageTime(msg.createdAt)}
-                                </span>
+                                {isCurrentUser && (
+                                  <div className="mt-1">
+                                    <LuMoreVertical
+                                      className="text-gray-400 cursor-pointer hover:text-gray-600"
+                                      onClick={(e) =>
+                                        handleContextMenu(e, msg._id, true)
+                                      }
+                                    />
+                                  </div>
+                                )}
                               </>
                             ) : (
-                              // Show deleted message placeholder
-                              <div className="text-xs text-red-500 italic px-4 py-2.5">
-                                {msg.deletedBy && msg.deletedBy._id === user._id
-                                  ? "You deleted this message"
-                                  : `${msg.sender?.name} deleted this message`}
+                              <div
+                                className={`px-4 py-2.5 rounded-2xl max-w-md text-sm italic ${
+                                  isCurrentUser
+                                    ? "bg-blue-500/20 text-gray-500 rounded-tr-sm"
+                                    : "bg-gray-100/50 text-gray-500 rounded-tl-sm"
+                                }`}
+                              >
+                                Message deleted
                               </div>
                             )}
                           </div>
@@ -1221,148 +830,70 @@ const MessagingModal = ({ isOpen, onClose }) => {
                       );
                     })
                   ) : (
-                    <p className="text-center text-gray-400 mt-8">
-                      No messages yet
-                    </p>
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No messages yet</p>
+                    </div>
                   )}
-                  {/* Scroll anchor for auto-scroll */}
-                  <div ref={messagesEndRef} />
                 </div>
 
                 {/* Message Input */}
-                <div className="px-6 py-4 border-t flex flex-col gap-2">
-                  {/* Typing indicator */}
-                  {typingUsers[selectedChat?.id] && (
-                    <div className="text-xs text-gray-500 px-4">
-                      {selectedChat?.name} is typing...
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-3 items-center">
+                <div className="p-6 border-t">
+                  <div className="flex items-center gap-2">
                     <input
-                      type="file"
-                      id="fileInput"
-                      className="hidden"
-                      onChange={handleFileChange}
-                      accept="image/*,application/pdf,.doc,.docx,.txt,.zip"
-                      multiple
-                    />
-                    <button
-                      onClick={triggerFileInput}
-                      className="p-3.5 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition-colors"
-                      title="Send file"
-                    >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                        />
-                      </svg>
-                    </button>
-                    <input
-                      className="flex-1 px-4 py-3 border border-gray-200 rounded-full text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      type="text"
                       placeholder="Type a message..."
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
+                      onKeyPress={(e) => handleKeyPress(e, selectedChat.user._id)}
                     />
                     <button
-                      onClick={() => sendMessage(selectedFile)}
-                      disabled={!newMessage.trim() && !selectedFile}
-                      className="p-3.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      onClick={() => sendMessage(selectedChat.user._id)}
+                      disabled={!newMessage.trim()}
+                      className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                        />
-                      </svg>
+                      <LuSend className="text-lg" />
                     </button>
                   </div>
-                  {selectedFile && (
-                    <div className="flex flex-col gap-2 p-2 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{selectedFile.name}</div>
-                          <div className="text-xs text-gray-500">{(selectedFile.size / 1024).toFixed(1)} KB</div>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            setSelectedFile(null);
-                            setFileName("");
-                            setIsUploading(false);
-                          }}
-                          className="p-1 text-gray-500 hover:text-gray-700"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                      {isUploading && (
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out"
-                            style={{ width: `${uploadProgress}%` }}
-                          ></div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-400">
-                Select a conversation to start messaging
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center p-8">
+                  <div className="inline-block p-4 bg-blue-100 rounded-full mb-4">
+                    <LuSend className="text-3xl text-blue-600" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Start a conversation
+                  </h3>
+                  <p className="text-gray-500 max-w-md">
+                    Select a conversation from the list or search for a user to start messaging.
+                  </p>
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* FOOTER */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-white">
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium text-sm transition-colors"
+        {/* Context Menu */}
+        {contextMenu.visible && contextMenu.canDelete && (
+          <div
+            className="absolute bg-white border border-gray-200 rounded-md shadow-lg z-20"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
           >
-            Cancel
-          </button>
-        </div>
+            <button
+              className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-red-50 text-red-600"
+              onClick={() => {
+                deleteMessage(contextMenu.messageId);
+                setContextMenu({ ...contextMenu, visible: false });
+              }}
+            >
+              <LuTrash2 className="text-sm" />
+              Delete
+            </button>
+          </div>
+        )}
       </div>
-
-      {/* Context Menu for Message Deletion */}
-      {contextMenu.show && (
-        <div
-          ref={contextMenuRef}
-          className="fixed z-[100002] bg-white shadow-lg rounded-md py-1 min-w-[120px] border border-gray-200"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-        >
-          <button
-            onClick={() => deleteMessage(contextMenu.messageId)}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
-          >
-            Delete Message
-          </button>
-        </div>
-      )}
-
-
-
-
     </div>
   );
 };

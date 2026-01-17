@@ -1,331 +1,442 @@
-import { useState, useEffect } from "react";
-import { LuMessageSquare, LuX, LuSend } from "react-icons/lu";
-import axiosInstance from "../utils/axiosInstance";
-import { API_PATHS } from "../utils/apiPaths";
-import { socket } from "../components/utils/socket";
+import React, { useState, useEffect, useRef } from "react";
+import { LuSearch, LuSend, LuX } from "react-icons/lu";
+import axiosInstance from "../../utils/axiosInstance";
+import { API_PATHS } from "../../utils/apiPaths";
+import { socket } from "../utils/socket";
+import { getUserProfileImageUrl } from "../../utils/imageUtils";
 
-const ChatSidebar = ({ isOpen, onClose }) => {
+const ChatSidebar = ({ isOpen, onClose, onSelectChat }) => {
   const [conversations, setConversations] = useState([]);
-  const [selectedChat, setSelectedChat] = useState(null); // {type: 'direct', id: userId}
-  const [messages, setMessages] = useState([]);
+  const [selectedChat, setSelectedChat] = useState(null);
+  const [messages, setMessages] = useState({});
   const [newMessage, setNewMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const activeTab = "direct"; // Only direct messaging now
+  const [users, setUsers] = useState([]);
+  const [showUsers, setShowUsers] = useState(false);
+
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchConversations();
+      fetchUsers();
+    }
+  }, [isOpen]);
 
   const fetchConversations = async () => {
     try {
-      const response = await axiosInstance.get(
-        API_PATHS.MESSAGES.GET_CONVERSATIONS
-      );
+      const response = await axiosInstance.get(API_PATHS.MESSAGES.GET_CONVERSATIONS);
       setConversations(response.data.conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const response = await axiosInstance.get(API_PATHS.USERS.GET_ALL_USERS_FOR_MESSAGING);
+      setUsers(response.data.users.filter(user => user._id !== localStorage.getItem('userId')));
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
 
-
-  const fetchMessages = async () => {
+  const fetchMessages = async (chatId) => {
     try {
       const response = await axiosInstance.get(
-        API_PATHS.MESSAGES.GET_DIRECT_MESSAGES(selectedChat.id)
+        API_PATHS.MESSAGES.GET_DIRECT_MESSAGES(chatId)
       );
-      setMessages(response.data.messages.reverse()); // Reverse to show oldest first
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: response.data.messages.reverse()
+      }));
     } catch (error) {
       console.error("Error fetching messages:", error);
     }
   };
 
-  // Fetch conversations
-  useEffect(() => {
-    if (isOpen) {
-      fetchConversations();
-    }
-  }, [isOpen]);
-
-  // Fetch messages when a chat is selected
-  useEffect(() => {
-    if (selectedChat) {
-      fetchMessages();
-    }
-  }, [selectedChat]);
-
-  // Handle profile updates
-  useEffect(() => {
-    const handleProfileUpdate = (data) => {
-      // Update conversations with new profile image
-      setConversations((prevConversations) =>
-        prevConversations.map((conv) =>
-          conv.user._id === data.userId
-            ? {
-                ...conv,
-                user: {
-                  ...conv.user,
-                  profileImageUrl: data.profileImageUrl,
-                  name: data.name,
-                },
-              }
-            : conv
-        )
-      );
-
-      // Update messages if the sender is the updated user
-      setMessages((prevMessages) =>
-        prevMessages.map((message) =>
-          message.sender._id === data.userId
-            ? {
-                ...message,
-                sender: {
-                  ...message.sender,
-                  profileImageUrl: data.profileImageUrl,
-                  name: data.name,
-                },
-              }
-            : message
-        )
-      );
-    };
-
-    const handleWindowProfileUpdate = (e) => {
-      handleProfileUpdate(e.detail);
-    };
-
-    // Also refresh conversations to ensure latest data
-    const handleProfileUpdateAndRefresh = (data) => {
-      handleProfileUpdate(data);
-      fetchConversations();
-    };
-
-    socket.on("profileUpdated", handleProfileUpdateAndRefresh);
-    window.addEventListener("profileUpdated", handleWindowProfileUpdate);
-
-    return () => {
-      socket.off("profileUpdated", handleProfileUpdateAndRefresh);
-      window.removeEventListener("profileUpdated", handleWindowProfileUpdate);
-    };
-  }, [fetchConversations]);
-
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedChat) return;
+  const sendMessage = async (chatId) => {
+    if (!newMessage.trim() || !chatId) return;
 
     try {
-      const messageData = {
+      const response = await axiosInstance.post(API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE, {
+        recipientId: chatId,
         content: newMessage,
-        messageType: "text",
-      };
+        messageType: 'text'
+      });
 
-      messageData.recipientId = selectedChat.id;
-      await axiosInstance.post(
-        API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE,
-        messageData
-      );
+      // Update messages state
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: [...(prev[chatId] || []), response.data.message]
+      }));
 
       setNewMessage("");
-      fetchMessages(); // Refresh messages
+      fetchConversations(); // Refresh conversations to update last message
     } catch (error) {
       console.error("Error sending message:", error);
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e, chatId) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      sendMessage(chatId);
     }
   };
 
-  if (!isOpen) return null;
+  const handleSelectChat = (chat) => {
+    setSelectedChat(chat);
+    onSelectChat(chat);
+    if (!messages[chat.user._id]) {
+      fetchMessages(chat.user._id);
+    }
+    setShowUsers(false);
+  };
+
+  const filteredConversations = conversations.filter(conv =>
+    conv.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    conv.lastMessage.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredUsers = users.filter(user =>
+    user.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+    !conversations.some(conv => conv.user._id === user._id)
+  );
+
+  useEffect(() => {
+    const scrollToBottom = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+    scrollToBottom();
+  }, [messages, selectedChat]);
+
+  // Listen for new messages
+  useEffect(() => {
+    const handleMessageReceive = (message) => {
+      setMessages(prev => {
+        const updated = { ...prev };
+        const chatId = message.sender._id === localStorage.getItem('userId') 
+          ? message.recipient._id 
+          : message.sender._id;
+        
+        if (!updated[chatId]) {
+          updated[chatId] = [];
+        }
+        
+        updated[chatId] = [...updated[chatId], message];
+        return updated;
+      });
+
+      // Update conversations to show new message
+      setConversations(prev => 
+        prev.map(conv => {
+          if (conv.user._id === message.sender._id) {
+            return {
+              ...conv,
+              lastMessage: message.content,
+              lastMessageTime: message.createdAt
+            };
+          }
+          return conv;
+        })
+      );
+    };
+
+    socket.on('receiveMessage', handleMessageReceive);
+
+    return () => {
+      socket.off('receiveMessage', handleMessageReceive);
+    };
+  }, []);
+
+  // Listen for profile updates
+  useEffect(() => {
+    const handleProfileUpdate = (data) => {
+      // Update conversations with new profile image
+      setConversations(prevConversations => 
+        prevConversations.map(conv => 
+          conv.user._id === data.userId 
+            ? { ...conv, user: { ...conv.user, profileImageUrl: data.profileImageUrl, name: data.name } }
+            : conv
+        )
+      );
+      
+      // Update messages if the sender is the updated user
+      setMessages(prevMessages => {
+        const updatedMessages = {};
+        Object.keys(prevMessages).forEach(chatId => {
+          updatedMessages[chatId] = prevMessages[chatId].map(message => 
+            message.sender._id === data.userId
+              ? { ...message, sender: { ...message.sender, profileImageUrl: data.profileImageUrl, name: data.name } }
+              : message
+          );
+        });
+        return updatedMessages;
+      });
+    };
+    
+    socket.on('profileUpdated', handleProfileUpdate);
+    
+    return () => {
+      socket.off('profileUpdated', handleProfileUpdate);
+    };
+  }, []);
 
   return (
-    <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-lg z-50 transform transition-transform">
+    <div
+      className={`fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
+        isOpen ? "translate-x-0" : "translate-x-full"
+      }`}
+    >
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="p-4 border-b flex justify-between items-center">
-          <h3 className="font-semibold text-gray-800">Messages</h3>
+        <div className="p-4 border-b flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Messages</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
-            <LuX className="text-xl" />
+            <LuX className="text-lg" />
           </button>
         </div>
 
-
-
         {/* Search */}
         <div className="p-4 border-b">
-          <input
-            type="text"
-            placeholder="Search conversations..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <div className="relative">
+            <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search conversations..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => setShowUsers(true)}
+            />
+          </div>
         </div>
 
-        {selectedChat ? (
-          /* Chat View */
-          <div className="flex-1 flex flex-col">
-            {/* Chat Header */}
-            <div className="p-4 border-b flex items-center gap-3">
-                {conversations.find((c) => c.user._id === selectedChat.id)
-                  ?.user.profileImageUrl ? (
+        {/* Tabs */}
+        <div className="flex border-b">
+          <button
+            className={`flex-1 py-3 text-center font-medium ${
+              !showUsers ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
+            }`}
+            onClick={() => setShowUsers(false)}
+          >
+            Conversations
+          </button>
+          <button
+            className={`flex-1 py-3 text-center font-medium ${
+              showUsers ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
+            }`}
+            onClick={() => setShowUsers(true)}
+          >
+            New Chat
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {!selectedChat ? (
+            /* Conversations/List View */
+            <div className="overflow-y-auto h-full">
+              {showUsers ? (
+                /* Users List */
+                <>
+                  {filteredUsers.length > 0 ? (
+                    filteredUsers.map((user) => (
+                      <div
+                        key={user._id}
+                        className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center gap-3"
+                        onClick={() => handleSelectChat({ user })}
+                      >
+                        {user.profileImageUrl ? (
+                          <img
+                            src={getUserProfileImageUrl(user)}
+                            alt={user.name}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
+                            <span className="text-sm font-medium text-white">
+                              {user.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-gray-900 truncate">
+                            {user.name}
+                          </h4>
+                          <p className="text-sm text-gray-500 truncate">
+                            {user.email}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-8 text-center text-gray-500">
+                      {searchTerm ? "No users found" : "Start a new conversation"}
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Conversations List */
+                <>
+                  {filteredConversations.length > 0 ? (
+                    filteredConversations.map((conv) => (
+                      <div
+                        key={conv.user._id}
+                        className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
+                          selectedChat?.user._id === conv.user._id
+                            ? "bg-blue-50"
+                            : ""
+                        }`}
+                        onClick={() => handleSelectChat(conv)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {conv.user.profileImageUrl ? (
+                            <img
+                              src={getUserProfileImageUrl(conv.user)}
+                              alt={conv.user.name}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
+                              <span className="text-sm font-medium text-white">
+                                {conv.user.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center">
+                              <h4 className="font-medium text-gray-900 truncate">
+                                {conv.user.name}
+                              </h4>
+                              {conv.unreadCount > 0 && (
+                                <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                  {conv.unreadCount}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500 truncate">
+                              {conv.lastMessage}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-8 text-center text-gray-500">
+                      {searchTerm ? "No conversations found" : "No conversations yet"}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            /* Chat View */
+            <div className="flex flex-col h-full">
+              {/* Chat Header */}
+              <div className="p-4 border-b flex items-center gap-3">
+                {selectedChat.user.profileImageUrl ? (
                   <img
-                    src={
-                      conversations.find(
-                        (c) => c.user._id === selectedChat.id
-                      )?.user.profileImageUrl
-                    }
-                    alt={
-                      conversations.find(
-                        (c) => c.user._id === selectedChat.id
-                      )?.user.name
-                    }
+                    src={getUserProfileImageUrl(selectedChat.user)}
+                    alt={selectedChat.user.name}
                     className="w-10 h-10 rounded-full object-cover"
                   />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
                     <span className="text-sm font-medium text-white">
-                      {conversations
-                        .find((c) => c.user._id === selectedChat.id)
-                        ?.user.name.charAt(0)
-                        .toUpperCase() || "U"}
+                      {selectedChat.user.name.charAt(0).toUpperCase()}
                     </span>
                   </div>
                 )}
                 <div>
                   <h4 className="font-medium text-gray-900">
-                    {conversations.find((c) => c.user._id === selectedChat.id)
-                      ?.user.name || "User"}
+                    {selectedChat.user.name}
                   </h4>
                   <p className="text-sm text-gray-500">Online</p>
                 </div>
-            </div>
+              </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message._id}
-                  className={`flex ${
-                    message.sender._id === localStorage.getItem("userId")
-                      ? "justify-end"
-                      : "justify-start"
-                  }`}
-                >
-                  {message.sender._id !== localStorage.getItem("userId") && (
-                    <div className="mr-2 flex-shrink-0">
-                      {message.sender.profileImageUrl ? (
-                        <img
-                          src={message.sender.profileImageUrl}
-                          alt={message.sender.name}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                          <span className="text-xs font-medium text-white">
-                            {message.sender.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                {messages[selectedChat.user._id]?.map((message) => (
                   <div
-                    className={`max-w-xs px-4 py-2 rounded-lg ${
+                    key={message._id}
+                    className={`flex ${
                       message.sender._id === localStorage.getItem("userId")
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-100 text-gray-800"
+                        ? "justify-end"
+                        : "justify-start"
                     }`}
                   >
-                    
-                    <p className="text-sm">{message.content}</p>
-                    <p
-                      className={`text-xs mt-1 ${
-                        message.sender._id === localStorage.getItem("userId")
-                          ? "text-blue-100"
-                          : "text-gray-500"
-                      }`}
-                    >
-                      {new Date(message.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Message Input */}
-            <div className="p-4 border-t">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Type a message..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={!newMessage.trim()}
-                  className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <LuSend className="text-lg" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* Chat List View */
-          <div className="flex-1 overflow-y-auto">
-            {conversations.map((conv) => (
-                <div
-                  key={conv.user._id}
-                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
-                    selectedChat?.id === conv.user._id
-                      ? "bg-blue-50"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    setSelectedChat({ id: conv.user._id })
-                  }
-                >
-                  <div className="flex items-center gap-3">
-                    {conv.user.profileImageUrl ? (
-                      <img
-                        src={conv.user.profileImageUrl}
-                        alt={conv.user.name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                        <span className="text-sm font-medium text-white">
-                          {conv.user.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center">
-                        <h4 className="font-medium text-gray-900 truncate">
-                          {conv.user.name}
-                        </h4>
-                        {conv.unreadCount > 0 && (
-                          <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                            {conv.unreadCount}
-                          </span>
+                    {message.sender._id !== localStorage.getItem("userId") && (
+                      <div className="mr-2 flex-shrink-0">
+                        {message.sender.profileImageUrl ? (
+                          <img
+                            src={getUserProfileImageUrl(message.sender)}
+                            alt={message.sender.name}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+                            <span className="text-xs font-medium text-white">
+                              {message.sender.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 truncate">
-                        {conv.lastMessage}
+                    )}
+                    <div
+                      className={`max-w-xs px-4 py-2 rounded-lg ${
+                        message.sender._id === localStorage.getItem("userId")
+                          ? "bg-blue-500 text-white"
+                          : "bg-white text-gray-800"
+                      }`}
+                    >
+                      <p className="text-sm">{message.content}</p>
+                      <p
+                        className={`text-xs mt-1 ${
+                          message.sender._id === localStorage.getItem("userId")
+                            ? "text-blue-100"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        {new Date(message.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </p>
                     </div>
                   </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Message Input */}
+              <div className="p-4 border-t">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Type a message..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => handleKeyPress(e, selectedChat.user._id)}
+                  />
+                  <button
+                    onClick={() => sendMessage(selectedChat.user._id)}
+                    disabled={!newMessage.trim()}
+                    className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <LuSend className="text-lg" />
+                  </button>
                 </div>
-              ))}
-          </div>
-        )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
