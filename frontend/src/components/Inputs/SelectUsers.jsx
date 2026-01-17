@@ -2,33 +2,25 @@ import React, { useState, useEffect } from "react";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import Modal from "../Modal";
-import { getUserProfileImageUrl } from "../../utils/imageUtils";
 import { LuUsers } from "react-icons/lu";
+import { getUserProfileImageUrl } from "../../utils/imageUtils";
+import AvatarGroup from "../AvatarGroup";
 
 export default function SelectUsers({ selectedUsers, setSelectedUsers }) {
-  const [isOpen, setIsOpen] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
-
-  useEffect(() => {
-    setTempSelectedUsers(selectedUsers);
-  }, [selectedUsers]);
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await axiosInstance.get(API_PATHS.USERS.GET_ALL_USERS_FOR_MESSAGING);
-        setAllUsers(response.data.users);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      }
-    };
-
-    if (isOpen) {
-      fetchUsers();
-    }
-  }, [isOpen]);
-
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [tempSelectedUsers, setTempSelectedUsers] = useState([]);
+
+  const getAllUsers = async () => {
+    try {
+      const response = await axiosInstance.get(API_PATHS.USERS.GET_ALL_USERS);
+      if (response.data?.length > 0) {
+        setAllUsers(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
 
   const toggleUserSelection = (userId) => {
     setTempSelectedUsers((prev) =>
@@ -40,47 +32,51 @@ export default function SelectUsers({ selectedUsers, setSelectedUsers }) {
 
   const handleAssign = () => {
     setSelectedUsers(tempSelectedUsers);
-    setIsOpen(false);
+    setIsModalOpen(false);
   };
 
-  const selectedUserImages = allUsers
+  const selectedUserAvatars = allUsers
     .filter((user) => selectedUsers.includes(user._id))
     .map((user) => getUserProfileImageUrl(user));
 
-  return (
-    <div>
-      <div className="mb-2">
-        <button
-          className="flex items-center gap-2 text-primary text-sm font-medium underline"
-          onClick={() => setIsOpen(true)}
-        >
-          <LuUsers className="text-base" />
-          {selectedUsers.length > 0 ? `Select Users (${selectedUsers.length} selected)` : "Select Users"}
-        </button>
-      </div>
+  useEffect(() => {
+    const fetchUsers = async () => {
+      await getAllUsers();
+    };
 
-      {selectedUserImages.length > 0 && (
-        <div className="flex gap-2 mb-4">
-          {selectedUserImages.slice(0, 5).map((imgUrl, index) => (
-            <img
-              key={index}
-              src={imgUrl}
-              alt={`Selected user ${index + 1}`}
-              className="w-8 h-8 rounded-full border-2 border-white"
-            />
-          ))}
-          {selectedUserImages.length > 5 && (
-            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium">
-              +{selectedUserImages.length - 5}
-            </div>
-          )}
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    setTempSelectedUsers(selectedUsers);
+
+    return () => {};
+  }, [selectedUsers]);
+
+  return (
+    <div className="space-y-4 mt-2">
+      {selectedUserAvatars.length === 0 ? (
+        <button className="card-btn" onClick={() => setIsModalOpen(true)}>
+          <LuUsers className="text-sm" />
+          Add Members
+        </button>
+      ) : (
+        <button className="card-btn" onClick={() => setIsModalOpen(true)}>
+          <LuUsers className="text-sm" />
+          Edit Members ({selectedUserAvatars.length})
+        </button>
+      )}
+
+      {selectedUserAvatars.length > 0 && (
+        <div className="cursor-pointer" onClick={() => setIsModalOpen(true)}>
+          <AvatarGroup avatars={selectedUserAvatars} maxVisible={3} />
         </div>
       )}
 
       <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         title="Select Users"
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
       >
         <div className="space-y-4 h-[60vh] overflow-y-auto">
           {allUsers.map((user) => (
