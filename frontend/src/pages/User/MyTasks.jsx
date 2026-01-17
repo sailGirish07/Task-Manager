@@ -5,6 +5,7 @@ import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import TaskStatusTabs from "../../components/TaskStatusTabs";
 import TaskCard from "../../components/Cards/TaskCard";
+import { getUserProfileImageUrl } from "../../utils/imageUtils";
 
 export default function MyTask() {
   const [allTasks, setAllTasks] = useState([]);
@@ -97,7 +98,7 @@ export default function MyTask() {
                 createdAt={item.createdAt}
                 dueDate={item.dueDate}
                 assignedTo={item.assignedTo?.map(
-                  (item) => item.profileImageUrl
+                  (user) => getUserProfileImageUrl(user)
                 )}
                 attachmentCount={item.attachments?.length || 0}
                 completedTodoCount={item.completedTodoCount || 0}

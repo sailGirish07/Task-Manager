@@ -6,6 +6,7 @@ import moment from "moment";
 import { LuSquareArrowUpRight } from "react-icons/lu";
 import DashboardLayout from "../../components/layouts/DashboardLayout";
 import AvatarGroup from "../../components/AvatarGroup";
+import { getUserProfileImageUrl } from "../../utils/imageUtils";
 
 export default function ViewTaskDetails() {
   const { id } = useParams();
@@ -127,7 +128,7 @@ export default function ViewTaskDetails() {
 
                   <AvatarGroup
                     avatars={
-                      task?.assignedTo?.map((item) => item?.profileImageUrl) ||
+                      task?.assignedTo?.map((item) => getUserProfileImageUrl(item)) ||
                       []
                     }
                     maxVisible={5}

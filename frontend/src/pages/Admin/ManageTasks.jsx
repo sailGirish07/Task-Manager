@@ -7,6 +7,7 @@ import { LuFileSpreadsheet } from "react-icons/lu";
 import TaskCard from "../../components/Cards/TaskCard";
 import TaskStatusTabs from "../../components/TaskStatusTabs";
 import toast from "react-hot-toast";
+import { getUserProfileImageUrl } from "../../utils/imageUtils";
 
 export default function ManageTasks() {
   const [allTasks, setAllTasks] = useState([]);
@@ -105,8 +106,7 @@ export default function ManageTasks() {
               </button>
             )}
           </div>
-        </div>{" "}
-        {/* ✅ FIXED: Properly closed */}
+        </div> {/* ✅ FIXED: Properly closed */}
         {/* TASK LIST */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           {allTasks.length > 0 ? (
@@ -121,7 +121,7 @@ export default function ManageTasks() {
                 createdAt={item.createdAt}
                 dueDate={item.dueDate}
                 assignedTo={item.assignedTo?.map(
-                  (user) => user.profileImageUrl
+                  (user) => getUserProfileImageUrl(user)
                 )}
                 attachmentCount={item.attachments?.length || 0}
                 completedTodoCount={item.completedTodoCount || 0}
