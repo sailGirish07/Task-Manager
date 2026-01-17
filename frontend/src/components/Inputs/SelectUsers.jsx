@@ -3,11 +3,11 @@ import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import Modal from "../Modal";
 import { getUserProfileImageUrl } from "../../utils/imageUtils";
+import { LuUsers } from "react-icons/lu";
 
 export default function SelectUsers({ selectedUsers, setSelectedUsers }) {
   const [isOpen, setIsOpen] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
-  const [tempSelectedUsers, setTempSelectedUsers] = useState([]);
 
   useEffect(() => {
     setTempSelectedUsers(selectedUsers);
@@ -28,6 +28,8 @@ export default function SelectUsers({ selectedUsers, setSelectedUsers }) {
     }
   }, [isOpen]);
 
+  const [tempSelectedUsers, setTempSelectedUsers] = useState([]);
+
   const toggleUserSelection = (userId) => {
     setTempSelectedUsers((prev) =>
       prev.includes(userId)
@@ -47,13 +49,13 @@ export default function SelectUsers({ selectedUsers, setSelectedUsers }) {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm font-medium">Select Users:</span>
+      <div className="mb-2">
         <button
-          className="text-primary text-sm underline"
+          className="flex items-center gap-2 text-primary text-sm font-medium underline"
           onClick={() => setIsOpen(true)}
         >
-          {selectedUsers.length > 0 ? `(${selectedUsers.length} selected)` : "Select"}
+          <LuUsers className="text-base" />
+          {selectedUsers.length > 0 ? `Select Users (${selectedUsers.length} selected)` : "Select Users"}
         </button>
       </div>
 
