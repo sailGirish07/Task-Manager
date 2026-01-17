@@ -164,8 +164,21 @@ export default function Signup() {
             setError("Something went wrong. Please try again")
           }
           
-          // Clear error message after 2 seconds
-          setTimeout(() => setError(""), 2000);
+          // Clear error message and form after 2 seconds
+          setTimeout(() => {
+            setError("");
+            // Clear form fields
+            setFullName("");
+            setEmail("");
+            setPassword("");
+            setAdminInviteToken("");
+            setProfilePic(null);
+            
+            // Focus first input field after clearing
+            if (firstNameRef.current) {
+              firstNameRef.current.focus();
+            }
+          }, 2000);
         }
 
   };

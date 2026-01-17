@@ -238,7 +238,7 @@ export default function EnterCode() {
           <button
             type="submit"
             className="btn-primary w-full"
-            disabled={isLoading}
+            disabled={isLoading || isExpired}
           >
             {isLoading ? "Verifying..." : "Continue"}
           </button>

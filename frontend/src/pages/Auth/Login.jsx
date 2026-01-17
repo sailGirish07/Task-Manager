@@ -72,7 +72,7 @@ export default function Login() {
 
     // Show immediate loading feedback
     setSuccessMessage("Processing login...");
-    const successTimeout = setTimeout(() => setSuccessMessage(""), 3000);
+    const successTimeout = setTimeout(() => setSuccessMessage(""), 1500);
 
     try {
       const response = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
@@ -139,7 +139,7 @@ export default function Login() {
         setError("Something went wrong. Please try again");
       }
 
-      // Clear error message after 3 seconds to match other messages in the app
+      // Clear error message after 3 seconds to match new requirements
       setTimeout(() => setError(""), 3000);
     }
   };
