@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { LuSearch, LuSend, LuX, LuMoreVertical, LuTrash2 } from "react-icons/lu";
-import axiosInstance from "../../utils/axiosInstance";
-import { API_PATHS } from "../../utils/apiPaths";
+import axiosInstance from "../utils/axiosInstance";
+import { API_PATHS } from "../utils/apiPaths";
 import { socket } from "../utils/socket";
-import { UserContext } from "../../context/UserContext";
-import { getUserProfileImageUrl } from "../../utils/imageUtils";
+import { UserContext } from "../context/UserContext";
+import { getUserProfileImageUrl } from "../utils/imageUtils";
 
 // Force rebuild - import paths verified
 const BASE_URL = "https://task-manager-1-j9dy.onrender.com";
