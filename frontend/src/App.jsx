@@ -89,6 +89,9 @@ function App() {
 
             {/* Default routes */}
             <Route path="/" element={<Root />} />
+            
+            {/* Catch-all route for any unmatched paths */}
+            <Route path="*" element={<Root />} />
           </Routes>
         </Router>
       </div>
