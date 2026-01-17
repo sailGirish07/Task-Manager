@@ -270,7 +270,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
       ></div>
 
       {/* Modal Content */}
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl h-[70vh] max-h-[80vh] flex overflow-hidden z-10">
+      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl h-[70vh] max-h-[80vh] flex overflow-hidden z-10 mx-auto">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -901,6 +901,8 @@ const MessagingModal = ({ isOpen, onClose }) => {
 };
 
 export default MessagingModal;
+
+
 
 
 
