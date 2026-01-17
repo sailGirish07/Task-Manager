@@ -6,6 +6,7 @@ import { socket } from "../utils/socket";
 import { UserContext } from "../../context/UserContext";
 import { getUserProfileImageUrl } from "../../utils/imageUtils";
 
+// Force rebuild - import paths verified
 const BASE_URL = "https://task-manager-1-j9dy.onrender.com";
 
 const MessagingModal = ({ isOpen, onClose }) => {
@@ -899,6 +900,8 @@ const MessagingModal = ({ isOpen, onClose }) => {
 };
 
 export default MessagingModal;
+
+
 
 
 
