@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from "react";
-import { LuSearch, LuSend, LuX, LuMoreVertical, LuTrash2 } from "react-icons/lu";
+import { LuSearch, LuSend, LuX, LuEllipsisVertical, LuTrash2 } from "react-icons/lu";
 import axiosInstance from "../utils/axiosInstance";
 import { API_PATHS } from "../utils/apiPaths";
 // import { socket } from "../utils/socket";
@@ -807,7 +807,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                 </div>
                                 {isCurrentUser && (
                                   <div className="mt-1">
-                                    <LuMoreVertical
+                                    <LuEllipsisVertical
                                       className="text-gray-400 cursor-pointer hover:text-gray-600"
                                       onClick={(e) =>
                                         handleContextMenu(e, msg._id, true)
