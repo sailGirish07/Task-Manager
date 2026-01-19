@@ -97,10 +97,12 @@ const Notifications = () => {
       {isOpen && (
         <div
           className="fixed top-0 left-0 w-screen h-screen z-[99999] flex items-center justify-center bg-black/50"
+          onClick={() => setIsOpen(false)}
           style={{ margin: 0, padding: "1rem" }}
         >
           <div
             className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
             style={{ height: "85vh", maxHeight: "90vh" }}
           >
             {/* Header */}

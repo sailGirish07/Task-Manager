@@ -28,7 +28,12 @@ app.use(
 
 // Middleware
 app.use(express.json());
+
+// Serve uploads publicly for profile images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Note: File download routes are handled in messageRoutes.js to allow for proper authentication and file access control
+// See routes/messageRoutes.js for downloadFile and viewImage endpoints
 
 // Connect to database
 connectDB();

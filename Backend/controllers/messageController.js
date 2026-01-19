@@ -1,4 +1,5 @@
 const Message = require("../models/Message");
+const jwt = require('jsonwebtoken');
 
 const User = require("../models/User");
 const Notification = require("../models/Notification");
@@ -314,6 +315,145 @@ const updateMessageStatus = async (req, res) => {
   }
 };
 
+const path = require('path');
+const fs = require('fs');
+
+// Function to handle file downloads
+const downloadFile = async (req, res) => {
+  const filename = req.params.filename;
+  
+  // Validate filename to prevent directory traversal attacks
+  if (!filename || filename.includes('..') || filename.includes('/')) {
+    return res.status(400).json({ message: 'Invalid filename' });
+  }
+  
+  try {
+    // Extract token from query parameter or Authorization header
+    let token = req.query.token || req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+    
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id || decoded.userId;
+    
+    // Find messages containing this file
+    const message = await Message.findOne({
+      fileUrl: `/uploads/${filename}`,
+      $or: [
+        { sender: userId },
+        { recipient: userId }
+      ]
+    });
+    
+    if (!message) {
+      return res.status(403).json({ message: 'You do not have permission to access this file' });
+    }
+    
+    const filePath = path.join(__dirname, '../uploads', filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+    
+    // Set appropriate headers for file download
+    res.setHeader('Content-Type', message.fileType);
+    
+    // Preserve original filename from database
+    const originalName = message.fileName;
+    const encodedName = encodeURIComponent(originalName);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodedName}; filename="${originalName}"`
+    );
+    
+    // Stream the file directly
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    console.error('Error downloading file:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Function to handle file viewing (for display in browser or download)
+const viewImage = async (req, res) => {
+  const filename = req.params.filename;
+  
+  // Validate filename to prevent directory traversal attacks
+  if (!filename || filename.includes('..') || filename.includes('/')) {
+    return res.status(400).json({ message: 'Invalid filename' });
+  }
+  
+  try {
+    // Extract token from query parameter or Authorization header
+    let token = req.query.token || req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+    
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id || decoded.userId;
+    
+    // Find messages containing this file
+    const message = await Message.findOne({
+      fileUrl: `/uploads/${filename}`,
+      $or: [
+        { sender: userId },
+        { recipient: userId }
+      ]
+    });
+    
+    if (!message) {
+      return res.status(403).json({ message: 'You do not have permission to access this file' });
+    }
+    
+    const filePath = path.join(__dirname, '../uploads', filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+    
+    // For images, display inline in browser; for other files, prompt download
+    if (message.fileType?.startsWith('image/')) {
+      // Set headers for inline image display
+      res.setHeader('Content-Type', message.fileType);
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      res.setHeader('Content-Disposition', 'inline');
+    } else {
+      // Set headers to prompt download for non-image files
+      res.setHeader('Content-Type', message.fileType);
+      
+      // Preserve original filename from database
+      const originalName = message.fileName;
+      const encodedName = encodeURIComponent(originalName);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename*=UTF-8''${encodedName}; filename="${originalName}"`
+      );
+    }
+    
+    // Stream the file directly
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    console.error('Error viewing file:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+
 module.exports = {
   sendDirectMessage,
 
@@ -324,6 +464,8 @@ module.exports = {
   markMessagesAsRead,
   updateMessageStatus,
   setIo,
+  downloadFile,
+  viewImage,
 };
 
 

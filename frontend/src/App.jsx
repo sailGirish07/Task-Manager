@@ -71,7 +71,7 @@ function App() {
               <Route path="/admin/tasks" element={<ManageTasks />} />
               <Route path="/admin/create-task" element={<CreateTask />} />
               <Route path="/admin/users" element={<ManageUsers />} />
-              {/* <Route path='/admin/edit-profile' element={<AdminEditProfile/>}/> */}
+
             </Route>
 
             {/* Users Routes */}
@@ -84,7 +84,7 @@ function App() {
                 path="/user/task-details/:id"
                 element={<ViewTaskDetails />}
               />
-              {/* <Route path='/user/edit-profile' element={<UserEditProfile/>}/> */}
+
             </Route>
 
             {/* Default routes */}
@@ -100,7 +100,7 @@ function App() {
         toastOptions={{
           className: "",
           style: {
-            fontsize: "13px",
+            fontSize: "13px",
           },
         }}
       />

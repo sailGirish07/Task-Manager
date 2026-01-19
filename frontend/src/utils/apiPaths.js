@@ -66,6 +66,8 @@ export const API_PATHS = {
     UPDATE_MESSAGE_STATUS: "/api/messages/direct/delivered", // Update message status to delivered
 
     DELETE_MESSAGE: (messageId) => `/api/messages/${messageId}`, // Delete a message
+    VIEW_IMAGE: (filename) => `/api/messages/images/${filename}`, // View image
+    DOWNLOAD_FILE: (filename) => `/api/messages/files/${filename}`, // Download file
 
     // Conversations
     GET_CONVERSATIONS: "/api/messages/conversations", // Get user's conversations

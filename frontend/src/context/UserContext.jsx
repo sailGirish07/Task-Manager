@@ -9,34 +9,93 @@ export const UserProvider = ({ children }) => {
   const [loading, setLoading] = useState(true); // New state to track loading
 
   useEffect(() => {
-    if (user) return;
-
-    const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchUser = async () => {
-      try {
-        const response = await axiosInstance.get(API_PATHS.AUTH.GET_PROFILE);
-        setUser(response.data);
-      } catch (error) {
-        console.error("User not authenticated", error);
-        clearUser();
-      } finally {
+    const initializeUser = async () => {
+      const accessToken = localStorage.getItem("accessToken");
+      
+      if (!accessToken) {
+        setUser(null);
         setLoading(false);
+        return;
+      }
+      
+      // Check if we already have user data
+      if (!user) {
+        try {
+          const response = await axiosInstance.get(API_PATHS.AUTH.GET_PROFILE);
+          setUser(response.data);
+        } catch (error) {
+          console.error("User not authenticated", error);
+          clearUser();
+        }
+      }
+      
+      setLoading(false);
+    };
+    
+    initializeUser();
+  }, []); // Run only on initial mount
+  
+  // Listen for storage events to handle login/logout from other tabs
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      // Only respond to changes in our own tokens
+      if (e.key === 'accessToken') {
+        if (!e.newValue && user) {
+          // Token was removed, clear user
+          setUser(null);
+        } else if (e.newValue && !user) {
+          // Token was added, fetch user
+          const fetchUser = async () => {
+            try {
+              const response = await axiosInstance.get(API_PATHS.AUTH.GET_PROFILE);
+              setUser(response.data);
+            } catch (error) {
+              console.error("User not authenticated", error);
+              clearUser();
+            }
+          };
+          fetchUser();
+        }
       }
     };
-
-    fetchUser();
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [user]);
 
   const updateUser = (userData) => {
-    setUser(userData);
-    localStorage.setItem("accessToken", userData.accessToken);
-    localStorage.setItem("refreshToken", userData.refreshToken);
-    setLoading(false);
+    // If userData contains tokens but not full user profile, fetch the profile
+    if (userData.accessToken && !userData._id) {
+      // Store tokens first
+      localStorage.setItem("accessToken", userData.accessToken);
+      localStorage.setItem("refreshToken", userData.refreshToken);
+      
+      // Then fetch the full user profile
+      const fetchUserProfile = async () => {
+        try {
+          const response = await axiosInstance.get(API_PATHS.AUTH.GET_PROFILE);
+          setUser(response.data);
+        } catch (error) {
+          console.error("Error fetching user profile after login", error);
+          clearUser();
+        }
+      };
+      
+      fetchUserProfile();
+    } else {
+      // If full user data is provided, set it directly
+      setUser(userData);
+      if (userData.accessToken) {
+        localStorage.setItem("accessToken", userData.accessToken);
+      }
+      if (userData.refreshToken) {
+        localStorage.setItem("refreshToken", userData.refreshToken);
+      }
+      setLoading(false);
+    }
   };
 
   const clearUser = () => {

@@ -22,6 +22,18 @@ router.put("/direct/delivered", protect, updateMessageStatus); // Update status 
 router.delete("/:messageId", protect, deleteMessage); // Delete a message
 
 // Conversations
+// File download route
+router.get('/files/:filename', (req, res) => {
+  const messageController = require('../controllers/messageController');
+  messageController.downloadFile(req, res);
+});
+
+// Image view route
+router.get('/images/:filename', (req, res) => {
+  const messageController = require('../controllers/messageController');
+  messageController.viewImage(req, res);
+});
+
 router.get("/conversations", protect, getUserConversations); // Get user's conversations
 
 module.exports = router;

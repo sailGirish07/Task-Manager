@@ -13,6 +13,26 @@ const ChatSidebar = ({ isOpen, onClose, onSelectChat }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [users, setUsers] = useState([]);
   const [showUsers, setShowUsers] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState(new Set()); // Track online users
+    
+  // Function to check if user is online with 5-minute grace period
+  const isUserOnlineWithGracePeriod = (userId, lastActive) => {
+    // Check if user is in the online users list
+    if (onlineUsers.has(userId)) {
+      return true;
+    }
+      
+    // If not in online list, check if last active was within 5 minutes
+    if (lastActive) {
+      const lastActiveTime = new Date(lastActive).getTime();
+      const currentTime = Date.now();
+      const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+        
+      return (currentTime - lastActiveTime) <= fiveMinutes;
+    }
+      
+    return false;
+  };
 
   const messagesEndRef = useRef(null);
 
@@ -26,16 +46,45 @@ const ChatSidebar = ({ isOpen, onClose, onSelectChat }) => {
   const fetchConversations = async () => {
     try {
       const response = await axiosInstance.get(API_PATHS.MESSAGES.GET_CONVERSATIONS);
-      setConversations(response.data.conversations);
+      // Sort conversations by last message time (most recent first)
+      const sortedConversations = response.data.conversations.sort((a, b) => {
+        const timeA = new Date(a.lastMessageAt || a.lastMessageTime || a.createdAt || Date.now()).getTime();
+        const timeB = new Date(b.lastMessageAt || b.lastMessageTime || b.createdAt || Date.now()).getTime();
+        return timeB - timeA; // Descending order (most recent first)
+      });
+      setConversations(sortedConversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
+    }
+  };
+  
+  const markMessagesAsRead = async (senderId) => {
+    try {
+      await axiosInstance.put(API_PATHS.MESSAGES.MARK_MESSAGES_AS_READ, { senderId });
+      
+      // Update local conversation unread count
+      setConversations(prev => 
+        prev.map(conv => {
+          if (conv.user._id === senderId) {
+            return {
+              ...conv,
+              unreadCount: 0 // Reset unread count after marking as read
+            };
+          }
+          return conv;
+        })
+      );
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
     }
   };
 
   const fetchUsers = async () => {
     try {
       const response = await axiosInstance.get(API_PATHS.USERS.GET_ALL_USERS_FOR_MESSAGING);
-      setUsers(response.data.users.filter(user => user._id !== localStorage.getItem('userId')));
+      const currentUserFilteredUsers = response.data.users.filter(user => user._id !== localStorage.getItem('userId'));
+      setUsers(currentUserFilteredUsers);
+      setAllUsers(response.data.users); // Store all users for lastActive info
     } catch (error) {
       console.error("Error fetching users:", error);
     }
@@ -71,8 +120,16 @@ const ChatSidebar = ({ isOpen, onClose, onSelectChat }) => {
         [chatId]: [...(prev[chatId] || []), response.data.message]
       }));
 
+      // Refresh conversations after sending message to ensure correct data
+      fetchConversations();
+      
+      // Auto scroll to bottom when sending message
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+
       setNewMessage("");
-      fetchConversations(); // Refresh conversations to update last message
+      // fetchConversations(); // Refresh conversations to update last message - now called above
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -85,16 +142,39 @@ const ChatSidebar = ({ isOpen, onClose, onSelectChat }) => {
     }
   };
 
-  const handleSelectChat = (chat) => {
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  
+  const handleSelectChat = async (chat) => {
     setSelectedChat(chat);
     onSelectChat(chat);
-    if (!messages[chat.user._id]) {
-      fetchMessages(chat.user._id);
-    }
     setShowUsers(false);
+    setIsLoadingMessages(true); // Show loader when opening chat
+    
+    try {
+      if (!messages[chat.user._id]) {
+        await fetchMessages(chat.user._id);
+      }
+      
+      // Mark messages as read when opening the chat
+      await markMessagesAsRead(chat.user._id);
+    } finally {
+      setIsLoadingMessages(false); // Hide loader after messages are loaded
+    }
+    
+    // Auto scroll to bottom when chat is opened
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   };
 
-  const filteredConversations = conversations.filter(conv =>
+  // Sort conversations by last message time (most recent first) and then apply filter
+  const sortedConversations = [...conversations].sort((a, b) => {
+    const timeA = new Date(a.lastMessageAt || a.lastMessageTime || a.createdAt || Date.now()).getTime();
+    const timeB = new Date(b.lastMessageAt || b.lastMessageTime || b.createdAt || Date.now()).getTime();
+    return timeB - timeA; // Descending order (most recent first)
+  });
+  
+  const filteredConversations = sortedConversations.filter(conv =>
     conv.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     conv.lastMessage.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -129,18 +209,35 @@ const ChatSidebar = ({ isOpen, onClose, onSelectChat }) => {
       });
 
       // Update conversations to show new message
-      setConversations(prev => 
-        prev.map(conv => {
-          if (conv.user._id === message.sender._id) {
+      setConversations(prev => {
+        const updated = prev.map(conv => {
+          // Handle both sender and recipient scenarios
+          if (conv.user._id === message.sender._id || conv.user._id === message.recipient?._id) {
             return {
               ...conv,
               lastMessage: message.content,
-              lastMessageTime: message.createdAt
+              lastMessageTime: message.createdAt,
+              lastMessageType: message.messageType || 'text', // Track message type for file vs text
+              // Preserve the user object to maintain correct display
+              user: { ...conv.user }, // Keep the original user info in the conversation
+              unreadCount: message.sender._id !== localStorage.getItem('userId') ? (conv.unreadCount || 0) + 1 : conv.unreadCount
             };
           }
           return conv;
-        })
-      );
+        });
+        
+        // Re-sort conversations by last message time after update
+        return updated.sort((a, b) => {
+          const timeA = new Date(a.lastMessageAt || a.lastMessageTime || a.createdAt || Date.now()).getTime();
+          const timeB = new Date(b.lastMessageAt || b.lastMessageTime || b.createdAt || Date.now()).getTime();
+          return timeB - timeA; // Descending order (most recent first)
+        });
+      });
+      
+      // Auto scroll to bottom when new message arrives
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     };
 
     socket.on('receiveMessage', handleMessageReceive);
@@ -180,6 +277,38 @@ const ChatSidebar = ({ isOpen, onClose, onSelectChat }) => {
     
     return () => {
       socket.off('profileUpdated', handleProfileUpdate);
+    };
+  }, []);
+
+  // Listen for online users
+  useEffect(() => {
+    const handleOnlineUsers = (users) => {
+      setOnlineUsers(new Set(users));
+    };
+    
+    const handleUserJoined = (userId) => {
+      setOnlineUsers(prev => new Set([...prev, userId]));
+    };
+    
+    const handleUserLeft = (userId) => {
+      setOnlineUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
+    };
+    
+    socket.on('onlineUsers', handleOnlineUsers);
+    socket.on('userJoined', handleUserJoined);
+    socket.on('userLeft', handleUserLeft);
+    
+    // Request current online users
+    socket.emit('getOnlineUsers');
+    
+    return () => {
+      socket.off('onlineUsers', handleOnlineUsers);
+      socket.off('userJoined', handleUserJoined);
+      socket.off('userLeft', handleUserLeft);
     };
   }, []);
 
@@ -310,17 +439,22 @@ const ChatSidebar = ({ isOpen, onClose, onSelectChat }) => {
                           )}
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-center">
-                              <h4 className="font-medium text-gray-900 truncate">
-                                {conv.user.name}
-                              </h4>
+                              <div className="flex flex-col">
+                                <h4 className="font-medium text-gray-900 truncate">
+                                  {conv.user.name}
+                                </h4>
+                                <p className="text-xs text-gray-500">
+                                  {isUserOnlineWithGracePeriod(conv.user._id, conv.user.lastActive) ? 'Online' : 'Offline'}
+                                </p>
+                              </div>
                               {conv.unreadCount > 0 && (
-                                <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                  {conv.unreadCount}
-                                </span>
+                                <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></span>
                               )}
                             </div>
                             <p className="text-sm text-gray-500 truncate">
-                              {conv.lastMessage}
+                              {conv.lastMessageType === 'file' 
+                                ? `📁 File sent`
+                                : conv.lastMessage}
                             </p>
                           </div>
                         </div>
@@ -356,62 +490,72 @@ const ChatSidebar = ({ isOpen, onClose, onSelectChat }) => {
                   <h4 className="font-medium text-gray-900">
                     {selectedChat.user.name}
                   </h4>
-                  <p className="text-sm text-gray-500">Online</p>
+                  <p className="text-sm text-gray-500">
+                    {isUserOnlineWithGracePeriod(selectedChat.user._id, selectedChat.user.lastActive) ? 'Online' : 'Offline'}
+                  </p>
                 </div>
               </div>
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                {messages[selectedChat.user._id]?.map((message) => (
-                  <div
-                    key={message._id}
-                    className={`flex ${
-                      message.sender._id === localStorage.getItem("userId")
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    {message.sender._id !== localStorage.getItem("userId") && (
-                      <div className="mr-2 flex-shrink-0">
-                        {message.sender.profileImageUrl ? (
-                          <img
-                            src={getUserProfileImageUrl(message.sender)}
-                            alt={message.sender.name}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                            <span className="text-xs font-medium text-white">
-                              {message.sender.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-xs px-4 py-2 rounded-lg ${
-                        message.sender._id === localStorage.getItem("userId")
-                          ? "bg-blue-500 text-white"
-                          : "bg-white text-gray-800"
-                      }`}
-                    >
-                      <p className="text-sm">{message.content}</p>
-                      <p
-                        className={`text-xs mt-1 ${
+                {isLoadingMessages ? (
+                  <div className="flex justify-center items-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  </div>
+                ) : (
+                  <>
+                    {messages[selectedChat.user._id]?.map((message) => (
+                      <div
+                        key={message._id}
+                        className={`flex ${
                           message.sender._id === localStorage.getItem("userId")
-                            ? "text-blue-100"
-                            : "text-gray-500"
+                            ? "justify-end"
+                            : "justify-start"
                         }`}
                       >
-                        {new Date(message.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
+                        {message.sender._id !== localStorage.getItem("userId") && (
+                          <div className="mr-2 flex-shrink-0">
+                            {message.sender.profileImageUrl ? (
+                              <img
+                                src={getUserProfileImageUrl(message.sender)}
+                                alt={message.sender.name}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+                                <span className="text-xs font-medium text-white">
+                                  {message.sender.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div
+                          className={`max-w-xs px-4 py-2 rounded-lg ${
+                            message.sender._id === localStorage.getItem("userId")
+                              ? "bg-blue-500 text-white"
+                              : "bg-white text-gray-800"
+                          }`}
+                        >
+                          <p className="text-sm">{message.content}</p>
+                          <p
+                            className={`text-xs mt-1 ${
+                              message.sender._id === localStorage.getItem("userId")
+                                ? "text-blue-100"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {new Date(message.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    <div ref={messagesEndRef} />
+                  </>
+                )}
               </div>
 
               {/* Message Input */}

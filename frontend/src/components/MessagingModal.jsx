@@ -1,29 +1,24 @@
-import React, { useState, useEffect, useRef, useContext } from "react";
-import { LuSearch, LuSend, LuX, LuTrash2, LuPaperclip } from "react-icons/lu";
+import { useState, useEffect, useContext, useRef } from "react";
 import axiosInstance from "../utils/axiosInstance";
 import { API_PATHS } from "../utils/apiPaths";
-import { socket } from "./utils/socket";
 import { UserContext } from "../context/UserContext";
-import { getUserProfileImageUrl } from "../utils/imageUtils";
-
-// const BASE_URL = "https://task-manager-1-j9dy.onrender.com";
-const BASE_URL = "http://localhost:8000"; // Updated to local backend
+import { socket } from "./utils/socket";
+import { getImageUrl } from "../utils/imageUtils";
 
 const MessagingModal = ({ isOpen, onClose }) => {
   const { user } = useContext(UserContext);
-  const [activeTab, setActiveTab] = useState("personal");
-  const [conversations, setConversations] = useState([]);
 
+  const [conversations, setConversations] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
-  const [fileName, setFileName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
   const [allUsers, setAllUsers] = useState([]); // For messaging
   const [onlineUsers, setOnlineUsers] = useState(new Set()); // Track online users
   const [contextMenu, setContextMenu] = useState({
@@ -32,28 +27,11 @@ const MessagingModal = ({ isOpen, onClose }) => {
     y: 0,
     messageId: null,
   }); // Context menu for message deletion
-  const [typingUsers, setTypingUsers] = useState({}); // Track typing indicators
-  const [readReceipts, setReadReceipts] = useState({}); // Track read receipts
   const contextMenuRef = useRef(null);
   const messagesEndRef = useRef(null); // For auto-scrolling to bottom
   const messagesContainerRef = useRef(null); // For messages container
-  const typingTimeoutRef = useRef({}); // Track typing timeouts
-  
-  // Typing indicator state
-  const [isTyping, setIsTyping] = useState(false);
-  
-  // Cleanup function for typing timeouts
-  useEffect(() => {
-    // Initialize typing timeout refs
-    return () => {
-      // Clear any typing timeouts when component unmounts
-      Object.keys(typingTimeoutRef.current).forEach(key => {
-        if (typingTimeoutRef.current[key]) {
-          clearTimeout(typingTimeoutRef.current[key]);
-        }
-      });
-    };
-  }, []);
+  const fileInputRef = useRef(null); // For file input
+  // For click outside detection handled by parent div onClick
 
   // Fetch initial data
   useEffect(() => {
@@ -113,172 +91,17 @@ const MessagingModal = ({ isOpen, onClose }) => {
       scrollToBottom();
     }
   }, [messages]); // Only run when messages change
-  
-  // Update read receipts when messages change
+
+  // Clean up image object URLs to prevent memory leaks
   useEffect(() => {
-    // Update read receipts based on message status
-    const newReadReceipts = {};
-    messages.forEach(msg => {
-      if (msg.status === 'read') {
-        newReadReceipts[msg._id] = 'read';
-      }
-    });
-    setReadReceipts(newReadReceipts);
-  }, [messages]);
-  
-  // Handle typing indicators
-  useEffect(() => {
-    if (typeof socket !== "undefined" && socket && selectedChat && selectedChat.type === "user") {
-      // Send typing indicator when user starts typing
-      if (newMessage.trim() !== "") {
-        if (!isTyping) {
-          setIsTyping(true);
-          socket.emit('typing', {
-            recipientId: selectedChat.id,
-            senderId: user._id,
-            isTyping: true
-          });
-        }
-        
-        // Clear any existing timeout
-        if (typingTimeoutRef.current[selectedChat.id]) {
-          clearTimeout(typingTimeoutRef.current[selectedChat.id]);
-        }
-        
-        // Set new timeout to stop typing indicator after 1 second of inactivity
-        typingTimeoutRef.current[selectedChat.id] = setTimeout(() => {
-          setIsTyping(false);
-          socket.emit('typing', {
-            recipientId: selectedChat.id,
-            senderId: user._id,
-            isTyping: false
-          });
-        }, 1000);
-      } else {
-        // If message is empty, stop typing indicator
-        if (isTyping) {
-          setIsTyping(false);
-          socket.emit('typing', {
-            recipientId: selectedChat.id,
-            senderId: user._id,
-            isTyping: false
-          });
-        }
-        
-        // Clear any existing timeout when message is empty
-        if (typingTimeoutRef.current[selectedChat.id]) {
-          clearTimeout(typingTimeoutRef.current[selectedChat.id]);
-        }
-      }
-    }
-    
     return () => {
-      // Clear timeout when component unmounts
-      if (typingTimeoutRef.current[selectedChat?.id]) {
-        clearTimeout(typingTimeoutRef.current[selectedChat?.id]);
-      }
+      messages.forEach(msg => {
+        if (msg.imagePreviewUrl) {
+          URL.revokeObjectURL(msg.imagePreviewUrl);
+        }
+      });
     };
-  }, [newMessage, selectedChat, socket, user._id, isTyping]);
-
-  // Listen for typing indicators from other users
-  useEffect(() => {
-    if (typeof socket !== "undefined" && socket && isOpen && selectedChat && selectedChat.type === "user") {
-      const handleTyping = (data) => {
-        if (data.senderId === selectedChat.id) {
-          setTypingUsers(prev => ({
-            ...prev,
-            [selectedChat.id]: data.isTyping
-          }));
-          
-          // Clear typing indicator after 1.5 seconds of inactivity
-          if (typingTimeoutRef.current[`typing_${selectedChat.id}`]) {
-            clearTimeout(typingTimeoutRef.current[`typing_${selectedChat.id}`]);
-          }
-          
-          // Set timeout to clear typing indicator after 1.5 seconds
-          typingTimeoutRef.current[`typing_${selectedChat.id}`] = setTimeout(() => {
-            setTypingUsers(prev => ({
-              ...prev,
-              [selectedChat.id]: false
-            }));
-          }, 1500);
-        }
-      };
-      
-      socket.on('typing', handleTyping);
-      
-      return () => {
-        socket.off('typing', handleTyping);
-        // Clear any typing timeout on unmount
-        if (typingTimeoutRef.current[`typing_${selectedChat.id}`]) {
-          clearTimeout(typingTimeoutRef.current[`typing_${selectedChat.id}`]);
-        }
-      };
-    }
-  }, [socket, selectedChat, isOpen]);
-
-  // Listen for read receipts
-  useEffect(() => {
-    if (typeof socket !== "undefined" && socket && isOpen && selectedChat && selectedChat.type === "user") {
-      const handleReadReceipt = (data) => {
-        // Update message status when recipient reads the message
-        setReadReceipts(prev => ({
-          ...prev,
-          [data.messageId]: 'read'
-        }));
-        
-        // Update the specific message status to 'read'
-        setMessages(prevMessages => 
-          prevMessages.map(msg => 
-            msg._id === data.messageId ? { ...msg, status: 'read' } : msg
-          )
-        );
-      };
-      
-      socket.on('messageRead', handleReadReceipt);
-      
-      return () => {
-        socket.off('messageRead', handleReadReceipt);
-      };
-    }
-  }, [socket, isOpen, selectedChat]);
-
-  // Send read receipts when messages are viewed
-  useEffect(() => {
-    if (selectedChat && messages.length > 0 && typeof socket !== "undefined" && socket && selectedChat.type === "user") {
-      // Find messages from the selected user that haven't been marked as read
-      const unreadMessages = messages.filter(msg => 
-        msg.sender?._id === selectedChat.id && 
-        msg.status !== 'read'
-      );
-      
-      if (unreadMessages.length > 0) {
-        // Mark these messages as read
-        unreadMessages.forEach(msg => {
-          // Update local message status
-          setMessages(prevMessages => 
-            prevMessages.map(m => 
-              m._id === msg._id ? { ...m, status: 'read' } : m
-            )
-          );
-          
-          // Send read receipt via socket
-          socket.emit('messageRead', {
-            senderId: msg.sender._id,
-            recipientId: user._id,
-            messageId: msg._id
-          });
-          
-          // Update message status in backend
-          axiosInstance.put(API_PATHS.MESSAGES.MARK_MESSAGES_AS_READ, {
-            senderId: msg.sender._id
-          }).catch(err => {
-            console.error('Error marking message as read:', err);
-          });
-        });
-      }
-    }
-  }, [selectedChat, messages, socket, user._id]);
+  }, [messages]);
 
   // Handle real-time messages
   useEffect(() => {
@@ -319,7 +142,6 @@ const MessagingModal = ({ isOpen, onClose }) => {
           selectedChat.type === "user" &&
           selectedChat.id === data.sender._id
         ) {
-          // Add the new message to the messages array
           setMessages((prevMessages) => [...prevMessages, data.message]);
         }
       };
@@ -338,12 +160,8 @@ const MessagingModal = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (selectedChat) {
       fetchMessages();
-      
-      // Only mark as read/delivered for direct messages
-      if (selectedChat.type === "user") {
-        markMessagesAsRead(); // Mark as read when opening chat
-        updateMessageStatusToDelivered(); // Update to delivered if not already
-      }
+      markMessagesAsRead(); // Mark as read when opening chat
+      updateMessageStatusToDelivered(); // Update to delivered if not already
     }
   }, [selectedChat]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -396,11 +214,55 @@ const MessagingModal = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       setError(null);
+      let response;
+      if (selectedChat.type === "user") {
+        response = await axiosInstance.get(
+          API_PATHS.MESSAGES.GET_DIRECT_MESSAGES(selectedChat.id)
+        );
+      } else {
+        response = await axiosInstance.get(
+          API_PATHS.MESSAGES.GET_GROUP_MESSAGES(selectedChat.id)
+        );
+      }
       
-      const response = await axiosInstance.get(
-        API_PATHS.MESSAGES.GET_DIRECT_MESSAGES(selectedChat.id)
-      );
-      setMessages(response.data.messages?.reverse() || []);
+      let messages = response.data.messages || [];
+      
+      // Reverse the messages for display (newest at bottom)
+      messages.reverse();
+      
+      // Preload image previews for file messages that are images
+      messages = await Promise.all(messages.map(async (msg) => {
+        if (msg.messageType === 'file' && msg.fileType?.startsWith('image/')) {
+          try {
+            const filename = msg.fileUrl.split('/').pop();
+            const imageUrl = `${API_PATHS.BASE_URL}${API_PATHS.MESSAGES.VIEW_IMAGE(filename)}`;
+            const token = localStorage.getItem('token');
+            
+            const imageResponse = await fetch(imageUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (imageResponse.ok) {
+              const blob = await imageResponse.blob();
+              const previewUrl = URL.createObjectURL(blob);
+              
+              // Return a new message object with the preview URL
+              return {
+                ...msg,
+                imagePreviewUrl: previewUrl
+              };
+            }
+          } catch (err) {
+            console.error('Error loading image preview:', err);
+          }
+        }
+        return msg;
+      }));
+      
+      setMessages(messages);
     } catch (error) {
       console.error("Error fetching messages:", error);
       setError("Failed to load messages");
@@ -468,7 +330,6 @@ const MessagingModal = ({ isOpen, onClose }) => {
       setError(null);
       
       const formData = new FormData();
-      formData.append('recipientId', selectedChat.id);
       formData.append('messageType', fileToSend ? 'file' : 'text');
       
       if (newMessage.trim()) {
@@ -479,34 +340,66 @@ const MessagingModal = ({ isOpen, onClose }) => {
         formData.append('file', fileToSend);
       }
 
-      // Send with progress tracking
-      await axiosInstance.post(
-        API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          },
-          onUploadProgress: (progressEvent) => {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            setUploadProgress(progress);
+      if (selectedChat.type === "user") {
+        formData.append('recipientId', selectedChat.id);
+        await axiosInstance.post(
+          API_PATHS.MESSAGES.SEND_DIRECT_MESSAGE,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            },
+            onUploadProgress: (progressEvent) => {
+              const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              setUploadProgress(progress);
+            }
           }
-        }
-      );
+        );
+      } else {
+        formData.append('groupId', selectedChat.id);
+        await axiosInstance.post(
+          API_PATHS.MESSAGES.SEND_GROUP_MESSAGE,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            },
+            onUploadProgress: (progressEvent) => {
+              const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              setUploadProgress(progress);
+            }
+          }
+        );
+      }
 
       setNewMessage("");
       setSelectedFile(null);
-      setFileName("");
       setIsUploading(false);
       setUploadProgress(0);
       await fetchMessages();
-      
     } catch (error) {
       console.error("Error sending message:", error);
       setError("Failed to send message. Please try again.");
     }
   };
-  
+
+
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (selectedFile) {
+        sendMessage(selectedFile);
+      } else {
+        sendMessage();
+      }
+    }
+  };
+
+  const handleFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -515,24 +408,209 @@ const MessagingModal = ({ isOpen, onClose }) => {
         return;
       }
       setSelectedFile(file);
-      setFileName(file.name);
-      setIsUploading(true);
-      setUploadProgress(0); // Reset progress
-      sendMessage(file); // Send the file immediately
-    }
-  };
-  
-  const triggerFileInput = () => {
-    document.getElementById('fileInput').click();
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+      // Don't auto-send file - wait for user to click send button
+      setIsUploading(false); // Reset upload state
+      setUploadProgress(0);
     }
   };
 
+  const handleFileClick = async (msg) => {
+    try {
+      // Get the filename from the fileUrl
+      const filename = msg.fileUrl.split('/').pop();
+      
+      // Construct the download URL with the filename
+      const downloadUrl = `${API_PATHS.BASE_URL}${API_PATHS.MESSAGES.DOWNLOAD_FILE(filename)}`;
+      
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('token');
+      
+      // Fetch the file with Authorization header to preserve binary integrity
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
+      }
+      
+      // Get the content disposition header to extract the original filename
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let downloadedFilename = msg.fileName || filename;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.*)|filename\*=(.*)|filename\s*=\s*"([^"]*)"|filename\s*=\s*([^;\s]*)/);
+        if (filenameMatch) {
+          downloadedFilename = decodeURIComponent(filenameMatch[1] || filenameMatch[2] || filenameMatch[3] || filenameMatch[4] || downloadedFilename);
+        }
+      }
+      
+      // Use the browser's native download functionality with a Blob
+      const blob = await response.blob();
+      
+      if (!blob || blob.size === 0) {
+        throw new Error("Downloaded file is empty");
+      }
+      
+      console.log("Downloaded MIME:", blob.type);
+      
+      // Create a temporary download link
+      const downloadLink = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      downloadLink.href = url;
+      downloadLink.download = downloadedFilename;
+      downloadLink.style.display = 'none';
+      
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
+      // Clean up the URL object after a short delay
+      setTimeout(() => URL.revokeObjectURL(url), 200);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      setError('Failed to download file');
+    }
+  };
+
+  const handleImageClick = async (msg) => {
+    try {
+      // Get the filename from the fileUrl
+      const filename = msg.fileUrl.split('/').pop();
+      
+      // Construct the view URL with the filename
+      const imageUrl = `${API_PATHS.BASE_URL}${API_PATHS.MESSAGES.VIEW_IMAGE(filename)}`;
+      
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('token');
+      
+      // Open image in new tab for viewing by creating a temporary link with authorization
+      const response = await fetch(imageUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Image view failed: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const imageObjectUrl = URL.createObjectURL(blob);
+      const imageWindow = window.open();
+      imageWindow.document.write(`<img src="${imageObjectUrl}" alt="${msg.fileName}" style="max-width:100%; max-height:100%;" />`);
+      
+      // Clean up the URL object after some time
+      setTimeout(() => URL.revokeObjectURL(imageObjectUrl), 5000);
+    } catch (error) {
+      console.error('Error viewing image:', error);
+      setError('Failed to view image');
+    }
+  };
+
+  const handleImageView = async (msg) => {
+    try {
+      // Get the filename from the fileUrl
+      const filename = msg.fileUrl.split('/').pop();
+      
+      // Construct the view URL with the filename
+      const imageUrl = `${API_PATHS.BASE_URL}${API_PATHS.MESSAGES.VIEW_IMAGE(filename)}`;
+      
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('token');
+      
+      // Open image in new tab for viewing by creating a temporary link with authorization
+      const response = await fetch(imageUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Image view failed: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const imageObjectUrl = URL.createObjectURL(blob);
+      const imageWindow = window.open();
+      imageWindow.document.write(`<img src="${imageObjectUrl}" alt="${msg.fileName}" style="max-width:100%; max-height:100%;" />`);
+      
+      // Clean up the URL object after some time
+      setTimeout(() => URL.revokeObjectURL(imageObjectUrl), 5000);
+    } catch (error) {
+      console.error('Error viewing image:', error);
+      setError('Failed to view image');
+    }
+  };
+
+  const handleImageDownload = async (msg) => {
+    try {
+      // Get the filename from the fileUrl
+      const filename = msg.fileUrl.split('/').pop();
+      
+      // Construct the download URL with the filename
+      const downloadUrl = `${API_PATHS.BASE_URL}${API_PATHS.MESSAGES.DOWNLOAD_FILE(filename)}`;
+      
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('token');
+      
+      // Fetch the file with Authorization header to preserve binary integrity
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
+      }
+      
+      // Get the content disposition header to extract the original filename
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let downloadedFilename = msg.fileName || filename;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.*)|filename\*=(.*)|filename\s*=\s*"([^"]*)"|filename\s*=\s*([^;\s]*)/);
+        if (filenameMatch) {
+          downloadedFilename = decodeURIComponent(filenameMatch[1] || filenameMatch[2] || filenameMatch[3] || filenameMatch[4] || downloadedFilename);
+        }
+      }
+      
+      // Use the browser's native download functionality with a Blob
+      const blob = await response.blob();
+      
+      if (!blob || blob.size === 0) {
+        throw new Error("Downloaded file is empty");
+      }
+      
+      console.log("Downloaded MIME:", blob.type);
+      
+      // Create a temporary download link
+      const downloadLink = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      downloadLink.href = url;
+      downloadLink.download = downloadedFilename;
+      downloadLink.style.display = 'none';
+      
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
+      // Clean up the URL object after a short delay
+      setTimeout(() => URL.revokeObjectURL(url), 200);
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      setError('Failed to download image');
+    }
+  };
 
   const isUserOnline = (userId) => {
     return onlineUsers.has(userId);
@@ -625,72 +703,17 @@ const MessagingModal = ({ isOpen, onClose }) => {
     (u) => !conversationUserIds.has(u._id)
   );
 
-  // Handle profile updates
-  useEffect(() => {
-    const handleProfileUpdate = (data) => {
-      // Update conversations with new profile image
-      setConversations(prevConversations => 
-        prevConversations.map(conv => 
-          conv.user._id === data.userId 
-            ? { ...conv, user: { ...conv.user, profileImageUrl: data.profileImageUrl, name: data.name } }
-            : conv
-        )
-      );
-      
-      // Update all users list
-      setAllUsers(prevUsers => 
-        prevUsers.map(user => 
-          user._id === data.userId
-            ? { ...user, profileImageUrl: data.profileImageUrl, name: data.name }
-            : user
-        )
-      );
-      
-      // Update messages if the sender is the updated user
-      setMessages(prevMessages => 
-        prevMessages.map(message => 
-          message.sender && message.sender._id === data.userId
-            ? { ...message, sender: { ...message.sender, profileImageUrl: data.profileImageUrl, name: data.name } }
-            : message
-        )
-      );
-      
-      // Update selected chat if it's the updated user
-      if (selectedChat && selectedChat.type === 'user' && selectedChat.id === data.userId) {
-        setSelectedChat(prev => ({
-          ...prev,
-          name: data.name,
-          profileImageUrl: data.profileImageUrl
-        }));
-      }
-    };
-    
-    const handleProfileUpdateAndRefresh = (data) => {
-      handleProfileUpdate(data);
-      fetchConversations(); // Refresh conversations to ensure latest data
-    };
-    
-    if (typeof socket !== "undefined" && socket && isOpen) {
-      socket.on('profileUpdated', handleProfileUpdateAndRefresh);
-    }
-    
-    return () => {
-      if (typeof socket !== "undefined" && socket) {
-        socket.off('profileUpdated', handleProfileUpdateAndRefresh);
-      }
-    };
-  }, [socket, isOpen, selectedChat, fetchConversations]);
-
-
   if (!isOpen) return null;
 
   return (
     <div
       className="fixed top-0 left-0 w-screen h-screen z-[99999] flex items-center justify-center bg-black/50"
+      onClick={onClose}
       style={{ margin: 0, padding: "1rem" }}
     >
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
         style={{ height: "85vh", maxHeight: "90vh" }}
       >
         {/* HEADER */}
@@ -733,7 +756,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
           {/* SIDEBAR */}
           <div className="w-[340px] border-r flex flex-col h-full">
             {/* Search */}
-            <div className="px-5 py-5 border-b">
+            <div className="px-5 py-4 border-b">
               <div className="relative">
                 <svg
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"
@@ -755,31 +778,21 @@ const MessagingModal = ({ isOpen, onClose }) => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              {searchTerm && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Found {filteredConversations.length + newUsers.length} result(s)
-                </p>
-              )}
-            </div>
 
+            </div>
 
             {/* User/Group List */}
             <div className="flex-1 overflow-y-auto">
-              {loading && (
+              {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
-              )}
-              {activeTab === "personal" && (
+              ) : (
                 <>
-                  {/* Existing Conversations */}
-                  {filteredConversations.length > 0 && (
-                    <>
-                      {searchTerm && (
-                        <div className="px-5 py-2 text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                          Conversations
-                        </div>
-                      )}
+                {/* Existing Conversations */}
+                {filteredConversations.length > 0 && (
+                  <>
+
                       {filteredConversations.map((conv) => (
                         <div
                           key={conv.user._id}
@@ -789,7 +802,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                               id: conv.user._id,
                               name: conv.user.name,
                               email: conv.user.email,
-                               profileImageUrl: conv.user.profileImageUrl, 
+                              profileImageUrl: conv.user.profileImageUrl,
                             });
                             setSearchTerm("");
                           }}
@@ -804,9 +817,9 @@ const MessagingModal = ({ isOpen, onClose }) => {
                             <div className="relative">
                               {conv.user.profileImageUrl ? (
                                 <img
-                                  src={getUserProfileImageUrl(conv.user)}
+                                  src={getImageUrl(conv.user.profileImageUrl)}
                                   alt={conv.user.name}
-                                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                  className="w-10 h-10 rounded-full object-cover"
                                 />
                               ) : (
                                 <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
@@ -850,9 +863,6 @@ const MessagingModal = ({ isOpen, onClose }) => {
                   {/* New Users (not in conversations yet) */}
                   {searchTerm && newUsers.length > 0 && (
                     <>
-                      <div className="px-5 py-2 text-xs font-semibold text-gray-500 uppercase bg-gray-50 sticky top-0">
-                        New Conversation
-                      </div>
                       {newUsers.map((user) => (
                         <div
                           key={user._id}
@@ -862,6 +872,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                               id: user._id,
                               name: user.name,
                               email: user.email,
+                              profileImageUrl: user.profileImageUrl,
                             });
                             setSearchTerm("");
                           }}
@@ -876,9 +887,9 @@ const MessagingModal = ({ isOpen, onClose }) => {
                             <div className="relative">
                               {user.profileImageUrl ? (
                                 <img
-                                  src={getUserProfileImageUrl(user)}
+                                  src={getImageUrl(user.profileImageUrl)}
                                   alt={user.name}
-                                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                  className="w-10 h-10 rounded-full object-cover"
                                 />
                               ) : (
                                 <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
@@ -971,7 +982,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                     <div className="relative">
                       {selectedChat.profileImageUrl ? (
                         <img
-                          src={getUserProfileImageUrl(selectedChat)}
+                          src={getImageUrl(selectedChat.profileImageUrl)}
                           alt={selectedChat.name}
                           className="w-11 h-11 rounded-full object-cover"
                         />
@@ -1024,7 +1035,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                           {!isCurrentUser && (
                             msg.sender?.profileImageUrl ? (
                               <img
-                                src={getUserProfileImageUrl(msg.sender)}
+                                src={getImageUrl(msg.sender.profileImageUrl)}
                                 alt={msg.sender.name}
                                 className="w-9 h-9 rounded-full object-cover mr-2 flex-shrink-0"
                               />
@@ -1061,28 +1072,31 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                     {msg.messageType === 'file' ? (
                                       msg.fileType?.startsWith('image/') ? (
                                         // Image file - show directly
-                                        <img
-                                          src={`${BASE_URL}${msg.fileUrl}`}
-                                          alt={msg.fileName}
-                                          className="max-w-[120px] max-h-32 rounded-lg object-cover"
-                                          onError={(e) => {
-                                            e.target.onerror = null;
-                                            e.target.src = '/placeholder-image.jpg'; // fallback image
-                                          }}
-                                        />
+                                        <div onClick={() => handleImageDownload(msg)} className="cursor-pointer">
+                                          <img
+                                            src={`${API_PATHS.BASE_URL}${API_PATHS.MESSAGES.VIEW_IMAGE(msg.fileUrl.split('/').pop())}`}
+                                            onError={(e) => {
+                                              // Fallback to handle image loading
+                                              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' fill='%23dee2e6'%3E%3Crect width='120' height='120'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='12' fill='%236c757d'%3EImage%3C/tex%3E%3C/svg%3E";
+                                            }}
+
+
+                                            alt={msg.fileName}
+                                            className="max-w-[120px] max-h-32 rounded-lg object-cover"
+                                          />
+                                        </div>
                                       ) : (
                                         // Non-image file - show as attachment
-                                        <a 
-                                          href={`${BASE_URL}${msg.fileUrl}`}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="flex flex-col gap-1"
+                                        <div
+
+                                          className="flex flex-col gap-1 cursor-pointer"
+                                          onClick={() => handleFileClick(msg)}
                                         >
                                           <div className="flex items-start gap-2 p-1.5 rounded bg-white border border-gray-200 hover:bg-gray-50 transition-colors">
                                             <div className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center bg-gray-100">
                                               {msg.fileType === 'application/pdf' ? (
                                                 <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                                 </svg>
                                               ) : msg.fileType?.includes('document') || msg.fileType?.includes('wordprocessing') ? (
                                                 <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1107,7 +1121,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                                               </div>
                                             </div>
                                           </div>
-                                        </a>
+                                        </div>
                                       )
                                     ) : (
                                       <span>{msg.content}</span>
@@ -1229,75 +1243,103 @@ const MessagingModal = ({ isOpen, onClose }) => {
                 </div>
 
                 {/* Message Input */}
-                <div className="px-6 py-4 border-t flex flex-col gap-2">
-                  {/* Typing indicator */}
-                  {typingUsers[selectedChat?.id] && (
-                    <div className="text-xs text-gray-500 px-4">
-                      {selectedChat?.name} is typing...
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-3 items-center">
-                    <input
-                      type="file"
-                      id="fileInput"
-                      className="hidden"
-                      onChange={handleFileChange}
-                      accept="image/*,application/pdf,.doc,.docx,.txt,.zip"
-                      multiple
-                    />
-                    <button
-                      onClick={triggerFileInput}
-                      className="p-3.5 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition-colors"
-                      title="Send file"
-                    >
-                      <LuPaperclip className="w-5 h-5" />
-                    </button>
-                    <input
-                      className="flex-1 px-4 py-3 border border-gray-200 rounded-full text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Type a message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                    />
-                    <button
-                      onClick={() => sendMessage()}
-                      disabled={!newMessage.trim() && !selectedFile}
-                      className="p-3.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <LuSend className="w-5 h-5" />
-                    </button>
-                  </div>
-                  {selectedFile && (
-                    <div className="flex flex-col gap-2 p-2 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{selectedFile.name}</div>
-                          <div className="text-xs text-gray-500">{(selectedFile.size / 1024).toFixed(1)} KB</div>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            setSelectedFile(null);
-                            setFileName("");
-                            setIsUploading(false);
-                          }}
-                          className="p-1 text-gray-500 hover:text-gray-700"
+                <div className="px-6 py-4 border-t">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleFileUpload}
+                        className="p-2.5 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
+                        title="Attach file"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                      {isUploading && (
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out"
-                            style={{ width: `${uploadProgress}%` }}
-                          ></div>
-                        </div>
-                      )}
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                          />
+                        </svg>
+                      </button>
+                      <input
+                        className="flex-1 px-4 py-3 border border-gray-200 rounded-full text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Type a message..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                      />
+                      <button
+                        onClick={() => {
+                          if (selectedFile) {
+                            sendMessage(selectedFile);
+                          } else {
+                            sendMessage();
+                          }
+                        }}
+                        disabled={!newMessage.trim() && !selectedFile}
+                        className="p-3.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                          />
+                        </svg>
+                      </button>
                     </div>
-                  )}
+                    
+                    {/* File Upload Preview */}
+                    {selectedFile && (
+                      <div className="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium text-gray-900 truncate">{selectedFile.name}</div>
+                              <div className="text-xs text-gray-500">
+                                {(selectedFile.size / 1024).toFixed(1)} KB
+                              </div>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setSelectedFile(null);
+                              setIsUploading(false);
+                              setUploadProgress(0);
+                            }}
+                            className="p-1 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-200"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        
+                        {/* Upload Progress Bar */}
+                        {isUploading && (
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out"
+                              style={{ width: `${uploadProgress}%` }}
+                            ></div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             ) : (
@@ -1318,6 +1360,15 @@ const MessagingModal = ({ isOpen, onClose }) => {
           </button>
         </div>
       </div>
+
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={handleFileChange}
+        accept="image/*,application/pdf,.doc,.docx,.txt,.zip,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      />
 
       {/* Context Menu for Message Deletion */}
       {contextMenu.show && (
