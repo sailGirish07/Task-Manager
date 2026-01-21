@@ -1,19 +1,40 @@
+// Gmail SMTP Implementation with Nodemailer
 const nodemailer = require('nodemailer');
 
 // Create transporter using Gmail SMTP
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+let transporter;
 
-// Transporter verification is skipped on startup to avoid blocking server initialization
-// It will be verified when sending the first email instead
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+
+  // Verify transporter configuration
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error('❌ Gmail SMTP configuration error:', error.message);
+    } else {
+      console.log('✅ Gmail SMTP transporter is ready');
+    }
+  });
+} else {
+  console.error('❌ Gmail SMTP credentials not set in environment variables!');
+  console.log('💡 Set EMAIL_USER and EMAIL_PASS in your .env file');
+  transporter = null;
+}
 
 const sendVerificationEmail = async (email, code) => {
   try {
+    // Check if transporter is properly initialized
+    if (!transporter) {
+      throw new Error('Email transport is not properly configured. EMAIL_USER and EMAIL_PASS are required.');
+    }
+    
+    // Prepare email options
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
@@ -45,21 +66,31 @@ const sendVerificationEmail = async (email, code) => {
         </div>
       `
     };
-
+    
+    // Send email
     const info = await transporter.sendMail(mailOptions);
-    // Log email sending in production environment if needed
+    console.log('✅ Verification email sent successfully:', info.messageId);
     return { success: true };
   } catch (error) {
-    console.error('Error sending verification email:', error.message || error);
+    console.error('❌ Error sending verification email:', {
+      message: error.message,
+      stack: error.stack
+    });
     return { success: false, error: error.message };
   }
 };
 
 const sendPasswordResetEmail = async (email, token) => {
   try {
+    // Check if transporter is properly initialized
+    if (!transporter) {
+      throw new Error('Email transport is not properly configured. EMAIL_USER and EMAIL_PASS are required.');
+    }
+    
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     const resetUrl = `${clientUrl}/reset-password?token=${token}`;
     
+    // Prepare email options
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
@@ -85,12 +116,16 @@ const sendPasswordResetEmail = async (email, token) => {
         </div>
       `
     };
-
+    
+    // Send email
     const info = await transporter.sendMail(mailOptions);
-    // Log email sending in production environment if needed
+    console.log('✅ Password reset email sent successfully:', info.messageId);
     return { success: true };
   } catch (error) {
-    console.error('Error sending password reset email:', error.message || error);
+    console.error('❌ Error sending password reset email:', {
+      message: error.message,
+      stack: error.stack
+    });
     return { success: false, error: error.message };
   }
 };

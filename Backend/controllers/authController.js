@@ -495,15 +495,9 @@ const forgotPassword = async (req, res) => {
     user.resetCodeExpires = codeExpires;
     await user.save();
     
-    // Send verification code email in the background
-    sendVerificationEmail(
-      user.email, 
-      `Password Reset Code: ${verificationCode}`,
-      `<p>You requested a password reset. Your verification code is:</p>
-       <h2 style="font-size: 24px; font-weight: bold;">${verificationCode}</h2>
-       <p>This code will expire in 60 seconds.</p>
-       <p>If you didn't request this, please ignore this email.</p>`
-    )
+    // Send verification email with password reset code in the background
+    const resetCodeMessage = `Password Reset Code: ${verificationCode}`;
+    sendVerificationEmail(user.email, verificationCode) // Just send the code, not the message
       .then(emailResult => {
         if (!emailResult.success) {
           console.error('Failed to send password reset email:', emailResult.error);
