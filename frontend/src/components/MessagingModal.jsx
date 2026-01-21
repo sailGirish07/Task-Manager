@@ -12,6 +12,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  // File sharing functionality - fresh implementation
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -323,21 +324,26 @@ const MessagingModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const sendMessage = async (fileToSend = null) => {
-    if ((!newMessage.trim() && !fileToSend) || !selectedChat) return;
+  const sendMessage = async () => {
+    if ((!newMessage.trim() && !selectedFile) || !selectedChat) return;
 
     try {
       setError(null);
       
       const formData = new FormData();
-      formData.append('messageType', fileToSend ? 'file' : 'text');
       
-      if (newMessage.trim()) {
+      if (selectedFile) {
+        // Send file message
+        formData.append('messageType', 'file');
+        formData.append('file', selectedFile);
+        if (newMessage.trim()) {
+          formData.append('content', newMessage);
+        }
+        setIsUploading(true);
+      } else {
+        // Send text message
+        formData.append('messageType', 'text');
         formData.append('content', newMessage);
-      }
-      
-      if (fileToSend) {
-        formData.append('file', fileToSend);
       }
 
       if (selectedChat.type === "user") {
@@ -373,13 +379,23 @@ const MessagingModal = ({ isOpen, onClose }) => {
       }
 
       setNewMessage("");
-      setSelectedFile(null);
-      setIsUploading(false);
-      setUploadProgress(0);
+      // Reset file state after successful send
+      if (selectedFile) {
+        setSelectedFile(null);
+        setIsUploading(false);
+        setUploadProgress(0);
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
       await fetchMessages();
     } catch (error) {
       console.error("Error sending message:", error);
       setError("Failed to send message. Please try again.");
+      // Reset upload state on error
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -388,29 +404,56 @@ const MessagingModal = ({ isOpen, onClose }) => {
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (selectedFile) {
-        sendMessage(selectedFile);
-      } else {
+      if (!isUploading) {
         sendMessage();
       }
     }
   };
 
-  const handleFileUpload = () => {
-    fileInputRef.current?.click();
+  // Fresh file upload implementation with real-time functionality
+  const handleFileUpload = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 0);
   };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
         setError("File size exceeds 10MB limit");
         return;
       }
+      
+      // Validate file type
+      const allowedTypes = [
+        'image/*',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain',
+        'application/zip'
+      ];
+      
       setSelectedFile(file);
-      // Don't auto-send file - wait for user to click send button
-      setIsUploading(false); // Reset upload state
+      setIsUploading(false); // Reset upload state for preview
       setUploadProgress(0);
+      setError(null); // Clear any previous errors
+    }
+  };
+
+  const removeSelectedFile = () => {
+    setSelectedFile(null);
+    setIsUploading(false);
+    setUploadProgress(0);
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -1247,7 +1290,13 @@ const MessagingModal = ({ isOpen, onClose }) => {
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={handleFileUpload}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleFileUpload(e);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
                         className="p-2.5 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
                         title="Attach file"
                       >
@@ -1273,14 +1322,8 @@ const MessagingModal = ({ isOpen, onClose }) => {
                         onKeyPress={handleKeyPress}
                       />
                       <button
-                        onClick={() => {
-                          if (selectedFile) {
-                            sendMessage(selectedFile);
-                          } else {
-                            sendMessage();
-                          }
-                        }}
-                        disabled={!newMessage.trim() && !selectedFile}
+                        onClick={sendMessage}
+                        disabled={(!newMessage.trim() && !selectedFile) || isUploading}
                         className="p-3.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         <svg
@@ -1315,11 +1358,7 @@ const MessagingModal = ({ isOpen, onClose }) => {
                             </div>
                           </div>
                           <button 
-                            onClick={() => {
-                              setSelectedFile(null);
-                              setIsUploading(false);
-                              setUploadProgress(0);
-                            }}
+                            onClick={removeSelectedFile}
                             className="p-1 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-200"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1361,12 +1400,16 @@ const MessagingModal = ({ isOpen, onClose }) => {
         </div>
       </div>
 
-      {/* Hidden File Input */}
+      {/* Hidden File Input for File Sharing */}
       <input
         type="file"
         ref={fileInputRef}
         className="hidden"
-        onChange={handleFileChange}
+        onChange={(e) => {
+          e.stopPropagation();
+          handleFileChange(e);
+        }}
+        onClick={(e) => e.stopPropagation()}
         accept="image/*,application/pdf,.doc,.docx,.txt,.zip,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       />
 

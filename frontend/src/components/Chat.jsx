@@ -139,6 +139,8 @@ const Chat = () => {
       fetchMessages(); // Refresh messages
     } catch (error) {
       console.error('Error sending message:', error);
+      // Ensure upload state is reset on error
+      setIsUploading(false);
     }
   };
   
@@ -150,11 +152,20 @@ const Chat = () => {
     }
   };
 
-  const handleFileUpload = () => {
-    fileInputRef.current?.click();
+  const handleFileUpload = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Add a small delay to ensure event propagation is stopped
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 0);
   };
 
   const handleFileChange = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     const file = e.target.files[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) { // 10MB limit
@@ -162,10 +173,30 @@ const Chat = () => {
         return;
       }
       setSelectedFile(file);
-      setIsUploading(true);
+      setIsUploading(false); // Don't auto-upload
       setUploadProgress(0); // Reset progress
-      sendMessage(file); // Send the file immediately
+      // Don't send immediately - wait for user to click send button
     }
+  };
+
+  // Handle file download/open with authentication
+  const handleFileDownload = (e, fileMessage) => {
+    e.preventDefault();
+    const token = localStorage.getItem('accessToken');
+    const filename = fileMessage.fileUrl.split('/').pop(); // Extract filename from path
+    
+    // Create a download link with token as query parameter
+    const downloadUrl = `${API_PATHS.BASE_URL}/api/messages/files/${filename}?token=${token}`;
+    window.open(downloadUrl, '_blank');
+  };
+
+  // Handle image view with authentication
+  const handleImageView = (imageUrl) => {
+    const token = localStorage.getItem('accessToken');
+    const filename = imageUrl.split('/').pop(); // Extract filename from path
+    
+    // Return URL with token for authenticated image viewing
+    return `${API_PATHS.BASE_URL}/api/messages/images/${filename}?token=${token}`;
   };
 
   return (
@@ -312,7 +343,7 @@ const Chat = () => {
                       message.fileType?.startsWith('image/') ? (
                         // Image file - show directly
                         <img
-                          src={`${API_PATHS.BASE_URL}${message.fileUrl}`}
+                          src={handleImageView(message.fileUrl)}
                           alt={message.fileName}
                           className="max-w-[120px] max-h-32 rounded-lg object-cover"
                           onError={(e) => {
@@ -322,11 +353,9 @@ const Chat = () => {
                         />
                       ) : (
                         // Non-image file - show as attachment
-                        <a 
-                          href={`${API_PATHS.BASE_URL}${message.fileUrl}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex flex-col gap-1"
+                        <div 
+                          onClick={(e) => handleFileDownload(e, message)}
+                          className="flex flex-col gap-1 cursor-pointer"
                         >
                           <div className="flex items-start gap-2 p-1.5 rounded bg-white border border-gray-200 hover:bg-gray-50 transition-colors">
                             <div className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center bg-gray-100">
@@ -357,7 +386,7 @@ const Chat = () => {
                               </div>
                             </div>
                           </div>
-                        </a>
+                        </div>
                       )
                     ) : (
                       <p className="text-sm">{message.content}</p>
@@ -376,7 +405,12 @@ const Chat = () => {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleFileUpload}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleFileUpload(e);
+                    }}
                     className="p-2 text-gray-500 hover:text-gray-700"
                     title="Attach file"
                   >
@@ -391,7 +425,14 @@ const Chat = () => {
                     onKeyPress={handleKeyPress}
                   />
                   <button
-                    onClick={() => sendMessage()}
+                    onClick={() => {
+                      if (selectedFile) {
+                        setIsUploading(true);
+                        sendMessage(selectedFile);
+                      } else {
+                        sendMessage();
+                      }
+                    }}
                     disabled={!newMessage.trim() && !selectedFile}
                     className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -447,6 +488,7 @@ const Chat = () => {
         ref={fileInputRef}
         className="hidden"
         onChange={handleFileChange}
+        onClick={(e) => e.stopPropagation()}
         accept="image/*,application/pdf,.doc,.docx,.txt,.zip"
         multiple
       />
